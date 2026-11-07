@@ -1,0 +1,10 @@
+{
+  "name": "flowpilot-diagram-assets",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild flow.js --bundle --format=esm --minify --outfile=flow.bundle.js --legal-comments=linked"
+  },
+  "dependencies": { "mermaid": "11.12.1" },
+  "devDependencies": { "esbuild": "0.25.12" }
+}

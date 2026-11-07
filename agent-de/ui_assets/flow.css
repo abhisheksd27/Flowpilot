@@ -1,0 +1,95 @@
+.flow-shell {
+  font-family: Arial, sans-serif;
+  width: 100%;
+  background: #0b1220;
+  border-radius: 14px;
+  padding: 8px 12px 12px;
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  min-height: 40px;
+  align-items: center;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+.flow-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+.flow-viewport {
+  height: 760px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overflow-anchor: none;
+  border: 1px solid #29364b;
+  border-radius: 12px;
+  background: #0b1220;
+  color: #e2e8f0;
+  scrollbar-color: #475569 #0b1220;
+  padding: 16px;
+  box-sizing: border-box;
+}
+.flow-viewport svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none !important;
+  background: transparent !important;
+}
+.node {
+  --fill: #172235;
+  --stroke: #64748b;
+  --text: #e2e8f0;
+}
+.node[data-status="running"] { --fill: #142d52; --stroke: #60a5fa; --text: #dbeafe; }
+.node[data-status="success"] { --fill: #12382d; --stroke: #4ade80; --text: #dcfce7; }
+.node[data-status="failed"] { --fill: #451f2a; --stroke: #f87171; --text: #fee2e2; }
+.node[data-status="repairing"] { --fill: #422c1a; --stroke: #fb923c; --text: #ffedd5; }
+.node rect, .node polygon, .node path, .node circle {
+  fill: var(--fill) !important;
+  stroke: var(--stroke) !important;
+  stroke-width: 2px !important;
+  transition: fill 500ms cubic-bezier(.22,1,.36,1), stroke 500ms ease;
+}
+.node text, .node .nodeLabel {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+  transition: fill 500ms ease, color 500ms ease;
+}
+path[id^="L_"] {
+  stroke: #94a3b8 !important;
+  transition: stroke 450ms ease;
+}
+marker path {
+  fill: #94a3b8 !important;
+  stroke: #94a3b8 !important;
+}
+.edgeLabel, .edgeLabel p, .edgeLabel span {
+  background-color: #0b1220 !important;
+  color: #cbd5e1 !important;
+}
+.edgeLabel text, .edgeLabel tspan { fill: #cbd5e1 !important; }
+.edgeLabel rect, .labelBkg { fill: #0b1220 !important; }
+path.flow-active {
+  stroke: #60a5fa !important;
+  stroke-dasharray: 7 5 !important;
+  animation: flow-travel 1.2s linear infinite;
+}
+path.flow-active.flow-repair { stroke: #fb923c !important; }
+@keyframes flow-travel { to { stroke-dashoffset: -24; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (max-width: 600px) {
+  .flow-viewport { height: 560px; padding: 8px; }
+  .flow-viewport svg { min-width: 720px; }
+}

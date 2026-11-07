@@ -14,7 +14,7 @@ flowchart TD
     SANDBOX --> STAGE[Attempt staging database]
     STAGE --> VALIDATE[Pandera and SQL validation]
     META[Expected schemas and table ownership] --> VALIDATE
-    VALIDATE -->|Pass| PUBLISH[Transactional publish within validation node]
+    VALIDATE -->|Pass| PUBLISH[Transactional publish]
     PUBLISH --> DB[Validated DuckDB warehouse]
     PUBLISH --> META
     VALIDATE -->|Fail| FIX[Diagnose and propose distinct repair]

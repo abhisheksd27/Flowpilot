@@ -10,7 +10,7 @@ Example request:
 
 This project is being built step by step. Environment setup is complete, as confirmed by the developer. Architecture and implementation guidance are documented. The end-to-end application is not implemented yet.
 
-Starter modules exist for configuration, disk caching, API access, and LLM adapters. Their presence does not mean they have passed tests. The workflow, sandbox, warehouse tools, validation, anomaly detection, CLI, UI, and evaluation remain to be implemented and verified.
+Starter modules exist for configuration, disk caching, API access, and LLM adapters. A Streamlit workflow simulation is present in `app.py`; result-panel guidance has been provided. Their presence does not mean they have passed tests. The real workflow, sandbox, warehouse tools, validation, anomaly detection, CLI, backend-connected UI, and evaluation remain to be implemented and verified.
 
 The developer writes implementation code. The assistant maintains documentation and provides implementation guidance and review when requested.
 
@@ -64,7 +64,7 @@ See [setup and configuration](docs/setup.md) for environment variables, provider
 
 ## Planned entry points
 
-These are the intended commands after their corresponding implementation steps are complete. `main.py`, `app.py`, test cases, and `eval/run_eval.py` are not present yet.
+`streamlit run app.py` launches the existing simulation frontend. The other commands are intended for later implementation steps: `main.py`, test cases, and `eval/run_eval.py` are not present yet. The frontend does not yet run a real pipeline.
 
 ```bash
 python main.py --request "Track daily weather and air quality for Bengaluru and flag anomalies."
@@ -78,6 +78,7 @@ python -m eval.run_eval
 | Document | What it explains |
 | --- | --- |
 | [Implementation plan](docs/implementation-plan.md) | Steps, ownership, and completion criteria |
+| [Frontend preview](docs/frontend.md) | Live workflow display, simulated events, and backend integration |
 | [Architecture](docs/architecture.md) | Components, data boundaries, and design decisions |
 | [Workflow](docs/workflow.md) | Node contracts, state, retry routing, and reporting |
 | [Setup](docs/setup.md) | Installation and existing configuration behavior |

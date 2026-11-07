@@ -12,7 +12,8 @@ Keep documentation synchronized after each completed step. Mark functionality co
 | --- | --- | --- | --- |
 | 1 | Python environment and dependencies | Complete, developer-confirmed | Python 3.11 and dependency import check succeed |
 | 2 | Architecture and workflow documentation | Written | Component boundaries, flow, and failure rules are documented |
-| 3 | Configuration | Starter exists; review next | Paths, provider selection, precedence, and invalid settings verified |
+| UI preview | Live workflow interface before backend coding | First increment present; full Mermaid topology and animated node states requested next; runtime verification pending | Full architecture colors follow events; result tabs, fixture chart, and report download work |
+| 3 | Configuration | Starter exists; resume after UI preview | Paths, provider selection, precedence, and invalid settings verified |
 | 4 | API ingestion and caching | Starters exist; verification pending | Approved requests work; cache, timeout, malformed JSON, and URL restrictions tested |
 | 5 | DuckDB and SQL permissions | Planned | Ownership enforced; transactions and idempotent writes tested |
 | 6 | Schemas and validation | Planned | Quality rules, source completeness, and migrations tested |
@@ -34,7 +35,11 @@ Write meaningful tests alongside each component. Step 12 assembles the full eval
 5. Run the relevant checks and inspect actual results.
 6. Update the documentation to reflect verified behavior.
 
-## Next step: configuration
+## Next step: frontend preview
+
+Build the Streamlit workflow preview before continuing backend implementation. Follow [frontend.md](frontend.md). The developer creates `app.py`; the assistant maintains documentation. The preview uses explicitly labeled simulated events and is not evidence that real ingestion or self-repair works. Later, adapt actual LangGraph and tool events to the same view.
+
+## After the preview: configuration
 
 Read `config.py` alongside [setup.md](setup.md). Confirm why configuration is shared by the CLI, UI, tools, and tests. Check `.env` precedence and project-relative data paths. Review settings validation before adding more components.
 
