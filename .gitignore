@@ -1,0 +1,10 @@
+# macOS metadata generated on external drives.
+.DS_Store
+._*
+.AppleDouble/
+.LSOverride
+
+# Editor temporary files.
+*.swp
+*.swo
+*~

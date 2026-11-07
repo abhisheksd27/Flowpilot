@@ -1,0 +1,34 @@
+flowchart TD
+    USER[Plain-English request] --> ENTRY[CLI or Streamlit]
+    ENTRY --> PLAN[Plan and validate plan]
+    PLAN <--> LLM[LLM client: Gemini, Groq, or Ollama]
+    PLAN --> CODE[Generate Python code]
+    CODE <--> LLM
+    CODE --> EXEC[Execute attempt]
+    EXEC --> API[Allowlisted API broker]
+    API <--> CACHE[API response cache]
+    API --> SOURCES[Open-Meteo APIs]
+    API --> INPUT[Approved response snapshots]
+    EXEC --> SANDBOX[Isolated Python subprocess]
+    INPUT --> SANDBOX
+    SANDBOX --> STAGE[Attempt staging database]
+    STAGE --> VALIDATE[Pandera and SQL validation]
+    META[Expected schemas and table ownership] --> VALIDATE
+    VALIDATE -->|Pass| PUBLISH[Transactional publish within validation node]
+    PUBLISH --> DB[Validated DuckDB warehouse]
+    PUBLISH --> META
+    VALIDATE -->|Fail| FIX[Diagnose and propose distinct repair]
+    EXEC -->|Execution error| FIX
+    FIX <--> LLM
+    FIX -->|Repair budget remains| EXEC
+    FIX -->|Budget exhausted or unsafe repair| FAILURE[Failure report]
+    DB --> ANOMALY[Z-score and IQR detection]
+    ANOMALY --> REPORT[Markdown report]
+    REPORT --> ENTRY
+    FAILURE --> ENTRY
+    PLAN -.-> LOG[Structured run log]
+    EXEC -.-> LOG
+    VALIDATE -.-> LOG
+    FIX -.-> LOG
+    PUBLISH -.-> LOG
+    ANOMALY -.-> LOG
