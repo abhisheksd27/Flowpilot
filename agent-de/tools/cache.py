@@ -26,7 +26,7 @@ class DiskCache:
             item = json.loads((self.directory / f"{key}.json").read_text())
             if time.time() - item["created"] < self.ttl:
                 return item["value"]
-        except (OSError, ValueError, KeyError, TypeError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
             pass
         return None
 

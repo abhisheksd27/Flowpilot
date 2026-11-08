@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+RUN pip install --no-cache-dir 'duckdb>=1.2,<2' 'pandas>=2.2,<3' 'numpy>=1.26,<3'
+COPY tools/_sandbox_worker.py /opt/worker.py
+ENV PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+ENTRYPOINT ["python", "-I", "/opt/worker.py"]

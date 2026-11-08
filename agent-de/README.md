@@ -1,116 +1,65 @@
-# Self-Healing Data Pipeline Agent
+# FlowPilot
 
-A Python 3.11 project that turns a plain-English weather and air-quality request into a pipeline that plans, ingests, transforms, loads, validates, attempts repairs, detects anomalies, and produces a Markdown report.
+A working local data engineering agent for daily Bengaluru weather and air quality. It fetches real Open-Meteo data, preserves raw inputs, builds validated DuckDB hourly and daily tables, attempts bounded repairs, flags statistical anomalies, and produces an attributable report. The dark live frontend animates actual workflow events.
 
-Example request:
+The default built-in engine runs without model credentials. Gemini, Groq and Ollama can generate plans/code inside the same validated catalog and sandbox boundaries.
 
-> Track daily weather and air quality for Bengaluru and flag anomalies.
+## Run
 
-## Current status
+```bash
+cd agent-de
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python main.py run --provider builtin
+streamlit run app.py
+```
 
-This project is being built step by step. Environment setup is complete, as confirmed by the developer. Architecture and implementation guidance are documented. The end-to-end application is not implemented yet.
+Python 3.11 and macOS sandbox-exec or Linux Docker are required. See [setup](docs/setup.md).
 
-Starter modules exist for configuration, disk caching, API access, and LLM adapters. A Streamlit workflow simulation is present in `app.py`; result-panel guidance has been provided. Their presence does not mean they have passed tests. The real workflow, sandbox, warehouse tools, validation, anomaly detection, CLI, backend-connected UI, and evaluation remain to be implemented and verified.
-
-The developer writes implementation code. The assistant maintains documentation and provides implementation guidance and review when requested.
-
-## Architecture
+## Flow
 
 ```mermaid
 flowchart TD
-    U[User request] --> I[CLI or Streamlit]
-    I --> P[Plan and validate plan]
-    P --> C[Generate code]
-    C --> E[Execute with API broker and isolated Python]
-    E --> S[Staging DuckDB database]
-    S --> V[Validate data and schema]
-    E -->|Execution failure| F[Diagnose and fix]
-    V -->|Validation failure| F
-    F -->|Distinct fix and budget available| E
-    F -->|Unable to recover| R[Failure report]
-    V -->|Pass| W[Transactional publish to warehouse]
-    W --> A[Detect anomalies]
-    A --> M[Markdown report]
-    M --> I
-    R --> I
+    UI[CLI / live Streamlit] --> PLAN[Plan and generate code]
+    PLAN --> BROKER[Allowlisted API broker and immutable bronze snapshots]
+    BROKER --> WORKER[Isolated Python and staging database]
+    WORKER --> CHECK[Pandera / SQL / schema / source reconciliation]
+    CHECK -->|Pass| LOAD[Transactional silver and gold publication]
+    CHECK -->|Fail| FIX[Distinct repair, at most three]
+    WORKER -->|Error| FIX
+    FIX --> WORKER
+    FIX -->|Unsafe or exhausted| FAIL[Failure report]
+    LOAD --> STATS[Z-score and IQR]
+    STATS --> REPORT[Markdown report and structured events]
 ```
 
-The detailed [architecture](docs/architecture.md), [diagram source](docs/architecture.mmd), and [workflow](docs/workflow.md) explain the boundaries, state, and repair loop.
-
-## Technology choices
-
-- Open-Meteo for the catalog of weather, air-quality, and geocoding endpoints.
-- DuckDB for the local warehouse and metadata.
-- Pandas and NumPy for transformations and statistics.
-- Pandera and SQL checks for validation.
-- LangGraph for workflow orchestration.
-- Gemini, Groq, or local Ollama through a common client interface.
-- Streamlit for the interface and pytest for offline tests.
-
-Use free-tier accounts where applicable. The application cannot guarantee provider quotas, model availability, or account billing settings. Local Ollama requires local compute and a separately installed model.
-
-## Setup
-
-From the project directory:
+## Hourly automation
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python main.py schedule --install --provider builtin --frequency hourly --at 08:00 --timezone Asia/Kolkata
+python main.py status
 ```
 
-See [setup and configuration](docs/setup.md) for environment variables, provider selection, and verification. Existing shell environment variables override the project `.env` file.
+This installs a local macOS service. Keep the computer awake and project drive mounted; the UI can close. See [operations](docs/operations.md) for catch-up, logs, stopping and Linux operation.
 
-## Planned entry points
-
-`streamlit run app.py` launches the existing simulation frontend. The other commands are intended for later implementation steps: `main.py`, test cases, and `eval/run_eval.py` are not present yet. The frontend does not yet run a real pipeline.
+## Verification
 
 ```bash
-python main.py --request "Track daily weather and air quality for Bengaluru and flag anomalies."
-streamlit run app.py
 python -m pytest -q
+FLOWPILOT_SANDBOX_TESTS=1 python -m pytest tests/test_sandbox.py -q
 python -m eval.run_eval
 ```
 
-## Documentation guide
+Verified real Bengaluru ingestion: 139 hourly records, six daily summaries, and zero duplicates on rerun. The deterministic failure evaluation recovered nine of nine injected cases; see [measured results](eval/results.md) and its scope. External model adapters use mocked tests; live model credentials and Docker were not tested. Data is modeled weather/air-quality output, not direct sensor readings.
 
-| Document | What it explains |
-| --- | --- |
-| [Implementation plan](docs/implementation-plan.md) | Steps, ownership, and completion criteria |
-| [Frontend preview](docs/frontend.md) | Live workflow display, simulated events, and backend integration |
-| [Architecture](docs/architecture.md) | Components, data boundaries, and design decisions |
-| [Workflow](docs/workflow.md) | Node contracts, state, retry routing, and reporting |
-| [Setup](docs/setup.md) | Installation and existing configuration behavior |
-| [Data model](docs/data-model.md) | Dataset keys, quality rules, and schema metadata |
-| [Tools](docs/tools.md) | Existing interfaces and planned tool contracts |
-| [Security](docs/security.md) | Sandbox and SQL permission requirements |
-| [Testing](docs/testing.md) | Offline tests, failure injection, and expected assertions |
-| [Evaluation](docs/evaluation.md) | Success definitions and evaluation output |
-| [Operations](docs/operations.md) | Logs, reruns, caches, and troubleshooting |
-| [Walkthrough](docs/walkthrough.md) | One example request traced through the design |
+## Documentation
 
-## Evaluation status
+- [Architecture](docs/architecture.md), [full diagram](docs/architecture.mmd), [workflow](docs/workflow.md)
+- [Setup](docs/setup.md), [frontend](docs/frontend.md), [operations](docs/operations.md)
+- [Data model](docs/data-model.md), [tool map](docs/tools.md), [security](docs/security.md)
+- [Testing](docs/testing.md), [evaluation](docs/evaluation.md), [walkthrough](docs/walkthrough.md), [implementation status](docs/implementation-plan.md)
 
-| Evaluation | Execution status | Measured result |
-| --- | --- | --- |
-| Offline failure-injection suite | Not implemented or run | No success rate available |
-| Live provider integration | Not run | No provider performance claim |
-| Sandbox isolation tests | Not implemented or run | No isolation guarantee demonstrated |
+Runtime data and secrets are ignored by Git. The supported scope is the environmental catalog with a fixed canonical output, single-writer local operation and bounded repair. Missing data is never fabricated. Arbitrary target migrations, long historical backfills and multi-tenant deployment need separate extensions.
 
-Actual results will be generated into `eval/results.md`; they must never be inferred from the design or replaced with invented numbers.
-
-## Assumptions and limitations
-
-- Initial source support is limited to the Open-Meteo catalog; other domains require new tools and contracts.
-- Initial operation allows one writer at a time. Concurrent writes require coordination before being supported.
-- A schedule suggestion does not schedule a job; the user manually runs the initial application.
-- Source timezones, aggregation, missing-data rules, and forecast semantics must be recorded in the plan.
-- Statistical anomaly flags do not establish a real-world incident or causal explanation.
-- Irrecoverable missing data must produce an honest failure or explicitly reported incomplete result.
-- Generated Python requires verified operating-system or container isolation. Import restrictions alone are insufficient.
-- Dependency ranges are not a reproducibility lockfile. Record installed versions when running evaluations.
-
-## Future work
-
-Add Prefect scheduling, dbt transformations and tests, additional API catalogs, longer anomaly baselines, dependency locking, and coordinated multi-user execution after the initial pipeline is verified.
+Hourly is now the default local cadence, at minute 00 in Asia/Kolkata. Use `--frequency daily --at 08:00` to restore daily operation. See [cloud hosting](docs/hosting.md) for the independent free hourly cloud pipeline and public dashboard.

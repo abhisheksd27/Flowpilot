@@ -124,9 +124,31 @@ class OllamaClient(HTTPClient):
         return data["message"]["content"], data.get("prompt_eval_count", 0), data.get("eval_count", 0)
 
 
+class BuiltinClient(LLMClient):
+    """Deterministic production rules for the supported environmental pipeline.
+
+    This is explicitly not an LLM and makes no inference-quality claim.
+    It implements the same interface so automatic runs need no paid services.
+    """
+    def __init__(self, settings: Settings):
+        self.metrics = {"calls": 0, "cache_hits": 0, "input_tokens": 0,
+                        "output_tokens": 0, "retries": 0}
+
+    def complete(self, system: str, prompt: str, *, json_mode: bool = True) -> str:
+        from pipeline.contracts import default_plan
+        payload = json.loads(prompt)
+        self.metrics["calls"] += 1
+        if payload["task"] == "plan":
+            return json.dumps(default_plan(payload["request"]))
+        if payload["task"] == "generate_code":
+            return payload["reference_code"]
+        return json.dumps({"code": payload["reference_code"], "diagnosis": payload["diagnosis"]})
+
+
 def make_client(settings: Settings) -> LLMClient:
-    """Select an adapter from validated configuration."""
-    providers = {"gemini": GeminiClient, "groq": GroqClient, "ollama": OllamaClient}
+    """Select explicit built-in rules or one of the three real model providers."""
+    providers = {"builtin": BuiltinClient, "gemini": GeminiClient,
+                 "groq": GroqClient, "ollama": OllamaClient}
     if settings.provider not in providers:
         raise ValueError(f"Unknown provider: {settings.provider}")
     return providers[settings.provider](settings)

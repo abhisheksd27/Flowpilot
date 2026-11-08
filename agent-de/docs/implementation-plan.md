@@ -1,46 +1,7 @@
-# Implementation Plan
+# Implementation status
 
-## Working agreement
+Implemented: configuration and provider adapters; API broker and cache; LangGraph planning/code/execution/repair/report workflow; OS-isolated worker; staged validation and source reconciliation; transactional bronze/silver/gold pipeline; schema tracking and ownership; anomaly reports; CLI; daily local scheduler; live dark animated frontend; unit, failure-injection, sandbox and evaluation suites.
 
-The developer writes implementation code and runs the implementation checks. The assistant writes documentation and supplies explanations, code guidance, and reviews when requested. Documentation work does not authorize editing application code.
+Validated on macOS with built-in planning and real Bengaluru data. Model adapters have mocked transport tests; live Gemini/Groq/Ollama and Docker integration remain environment-specific verification tasks. No credentials were assumed. Supported automation is daily environmental ingestion, not arbitrary business-system integration.
 
-Keep documentation synchronized after each completed step. Mark functionality complete only after the relevant behavior has been checked. Do not count starter files as verified implementation.
-
-## Progress and sequence
-
-| Step | Focus | Current status | Completion criteria |
-| --- | --- | --- | --- |
-| 1 | Python environment and dependencies | Complete, developer-confirmed | Python 3.11 and dependency import check succeed |
-| 2 | Architecture and workflow documentation | Written | Component boundaries, flow, and failure rules are documented |
-| UI preview | Live workflow interface before backend coding | First increment present; full Mermaid topology and animated node states requested next; runtime verification pending | Full architecture colors follow events; result tabs, fixture chart, and report download work |
-| 3 | Configuration | Starter exists; resume after UI preview | Paths, provider selection, precedence, and invalid settings verified |
-| 4 | API ingestion and caching | Starters exist; verification pending | Approved requests work; cache, timeout, malformed JSON, and URL restrictions tested |
-| 5 | DuckDB and SQL permissions | Planned | Ownership enforced; transactions and idempotent writes tested |
-| 6 | Schemas and validation | Planned | Quality rules, source completeness, and migrations tested |
-| 7 | Anomaly detection | Planned | Numeric baseline, thresholds, small samples, and constants handled |
-| 8 | LLM adapters and prompts | Adapter starter exists; prompts planned | Three adapters share a contract; mocks test formats, caching, and retries |
-| 9 | Python sandbox | Planned | Isolation, timeout, import policy, and API bridge verified |
-| 10 | LangGraph orchestration | Planned | Success path, bounded repair, repetition detection, and graceful failure tested |
-| 11 | CLI and Streamlit | Planned | Entry points, streamed log, tabs, preview, and download verified |
-| 12 | Failure evaluation and documentation review | Planned | Nine scenarios measured; results and runnable instructions documented |
-
-Write meaningful tests alongside each component. Step 12 assembles the full evaluation; it is not the first point at which testing begins.
-
-## Format for each coding step
-
-1. Explain the component's purpose and prerequisites.
-2. Define its input, output, and failure contract.
-3. Identify files for the developer to implement.
-4. Supply focused implementation guidance.
-5. Run the relevant checks and inspect actual results.
-6. Update the documentation to reflect verified behavior.
-
-## Next step: frontend preview
-
-Build the Streamlit workflow preview before continuing backend implementation. Follow [frontend.md](frontend.md). The developer creates `app.py`; the assistant maintains documentation. The preview uses explicitly labeled simulated events and is not evidence that real ingestion or self-repair works. Later, adapt actual LangGraph and tool events to the same view.
-
-## After the preview: configuration
-
-Read `config.py` alongside [setup.md](setup.md). Confirm why configuration is shared by the CLI, UI, tools, and tests. Check `.env` precedence and project-relative data paths. Review settings validation before adding more components.
-
-The existing `config.py`, API, cache, and LLM starters were created before the development responsibilities changed. They remain available for the developer to keep, adapt, or replace.
+Extensions: variable-length DST day completeness, configurable historical backfills, data retention, richer seasonal anomaly models, new source catalogs, container deployment and notifications. Add each as an explicit contract with failure and isolation tests.

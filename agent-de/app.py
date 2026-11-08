@@ -1,442 +1,150 @@
-"""Streamlit preview of the self-healing pipeline workflow."""
-
-from collections.abc import Iterator
-from datetime import datetime, timezone
-import time
-from typing import Any
-
+"""Live FlowPilot console: actual workflow events, warehouse data, and scheduled runs."""
+from dataclasses import replace
+from datetime import datetime
+import json
+import queue
+import threading
+from pathlib import Path
+import pandas as pd
 import streamlit as st
-
+from config import DEFAULT_REQUEST, Settings
+from pipeline.scheduler import scheduler_status
+from pipeline.warehouse import preview
+from tools.sql_tool import run_sql
+from ui_flow import NODE_LABELS, render_flow
 from ui_results import render_results
 
-from ui_flow import NODE_LABELS, render_flow
+st.set_page_config(page_title="FlowPilot", page_icon="🔄", layout="wide")
+settings = Settings.from_env()
+settings.prepare()
 
 
-st.set_page_config(
-    page_title="FlowPilot",
-    page_icon="🔄",
-    layout="wide",
-)
-
-MAX_RETRIES = 3
-
-STAGES = NODE_LABELS
-
-def new_view(request: str = "") -> dict[str, Any]:
-    """Create the UI state for one simulation."""
-    return {
-        "request": request,
-        "statuses": {node: "pending" for node in STAGES},
-        "events": [],
-        "retry_count": 0,
-        "outcome": "idle",
-    }
+def latest_result() -> dict:
+    """Read an atomically saved result, including runs produced by the scheduler."""
+    path = settings.data_dir / "latest.json"
+    try:
+        return json.loads(path.read_text()) if path.exists() else {}
+    except (ValueError, OSError):
+        return {}
 
 
-def make_event(
-    node: str,
-    status: str,
-    message: str,
-    retry_count: int,
-    outcome: str | None = None,
-) -> dict[str, Any]:
-    """Create one timestamped workflow event."""
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(
-            timespec="milliseconds"
-        ),
-        "node": node,
-        "status": status,
-        "message": message,
-        "retry_count": retry_count,
-        "outcome": outcome,
-    }
+def view_from_result(result: dict) -> dict:
+    """Restore actual historical node states; never animate fabricated progress."""
+    view = {"statuses": {n: "pending" for n in NODE_LABELS}, "events": [], "retry_count": 0,
+            "outcome": result.get("status", "idle"), "request": result.get("user_request", "")}
+    for event in result.get("step_history", []):
+        if event["node"] in view["statuses"]:
+            view["statuses"][event["node"]] = event["status"]
+        view["events"].append(event)
+        view["retry_count"] = event["retry_count"]
+    return view
 
 
-def simulate_step(
-    node: str,
-    message: str,
-    *,
-    status: str = "success",
-    retry_count: int = 0,
-    outcome: str | None = None,
-) -> Iterator[dict[str, Any]]:
-    """Emit start and finish events for one simulated operation."""
-    yield make_event(
-        node,
-        "running",
-        f"Starting simulated {STAGES[node].lower()}",
-        retry_count,
-    )
-
-    # Deliberately slow the demo so its transitions are visible.
-    time.sleep(0.7)
-
-    yield make_event(
-        node,
-        status,
-        message,
-        retry_count,
-        outcome,
-    )
-
-def simulate_pipeline(
-    scenario: str,
-) -> Iterator[dict[str, Any]]:
-    """Simulate detailed events across the full architecture."""
-    retry_count = 0
-
-    def event(
-        node: str,
-        status: str,
-        message: str,
-    ) -> dict[str, Any]:
-        """Create an event using the current repair counter."""
-        return make_event(
-            node,
-            status,
-            message,
-            retry_count,
-        )
-
-    def step(
-        node: str,
-        message: str,
-    ) -> Iterator[dict[str, Any]]:
-        """Animate one simulated component operation."""
-        yield from simulate_step(
-            node,
-            message,
-            retry_count=retry_count,
-        )
-
-    yield event(
-        "request",
-        "success",
-        "Demo request received.",
-    )
-    yield event(
-        "entry",
-        "running",
-        "Frontend is displaying the simulation.",
-    )
-    yield event(
-        "log",
-        "running",
-        "Collecting demo events in session memory.",
-    )
-
-    # Planning includes an LLM interaction.
-    yield event("plan", "running", "Preparing the demo plan.")
-    yield from step("llm", "Simulated planning response received.")
-    yield event("plan", "success", "Demo plan accepted.")
-
-    # Code generation includes another LLM interaction.
-    yield event(
-        "generate_code",
-        "running",
-        "Simulating code generation.",
-    )
-    yield from step("llm", "Simulated code response received.")
-    yield event(
-        "generate_code",
-        "success",
-        "Code-generation simulation completed; no code executed.",
-    )
-
-    while True:
-        yield event(
-            "execute",
-            "running",
-            f"Starting simulated attempt {retry_count + 1}.",
-        )
-
-        # API ingestion.
-        yield event("api", "running", "Preparing approved requests.")
-
-        yield from step(
-            "cache",
-            "Simulated cache lookup completed: cache miss.",
-        )
-        yield from step(
-            "sources",
-            "Simulated Open-Meteo response received.",
-        )
-        yield from step(
-            "snapshots",
-            "Simulated response snapshots prepared.",
-        )
-
-        yield event(
-            "api",
-            "success",
-            "API ingestion simulation completed.",
-        )
-
-        # Isolated execution and staging.
-        yield event(
-            "sandbox",
-            "running",
-            "Simulating isolated Python execution.",
-        )
-        yield from step(
-            "staging",
-            "Simulated staging table prepared.",
-        )
-        yield event(
-            "sandbox",
-            "success",
-            "Sandbox simulation completed.",
-        )
-        yield event(
-            "execute",
-            "success",
-            "Execution simulation completed.",
-        )
-
-        # Validation checks the accepted schema metadata.
-        yield event(
-            "validate",
-            "running",
-            "Checking the simulated staged output.",
-        )
-        yield from step(
-            "metadata",
-            "Simulated expected-schema comparison completed.",
-        )
-
-        should_fail = (
-            scenario == "Exhaust retries"
-            or (
-                scenario == "Recover after one failure"
-                and retry_count == 0
-            )
-        )
-
-        if should_fail:
-            yield event(
-                "validate",
-                "failed",
-                "Injected failure: duplicate business keys.",
-            )
-
-            if retry_count == MAX_RETRIES:
-                outcome = "failed"
-                break
-
-            retry_count += 1
-
-            yield event(
-                "diagnose_and_fix",
-                "running",
-                f"Preparing simulated repair {retry_count}.",
-            )
-            yield from step(
-                "llm",
-                "Simulated diagnosis and repair response received.",
-            )
-            yield event(
-                "diagnose_and_fix",
-                "success",
-                f"Simulated repair proposal {retry_count} prepared.",
-            )
-
-            continue
-
-        yield event(
-            "validate",
-            "success",
-            "Simulated validation passed.",
-        )
-
-        # Publishing remains active while data and metadata are updated.
-        yield event(
-            "publish",
-            "running",
-            "Simulating a warehouse transaction.",
-        )
-        yield from step(
-            "warehouse",
-            "Simulated warehouse update completed.",
-        )
-        yield from step(
-            "metadata",
-            "Simulated accepted-schema update completed.",
-        )
-        yield event(
-            "publish",
-            "success",
-            "Simulated transaction completed; no database was written.",
-        )
-
-        yield from step(
-            "anomaly_detect",
-            "Simulated anomaly analysis completed.",
-        )
-
-        outcome = "success"
-        break
-
-    if outcome == "success":
-        yield from step(
-            "report",
-            "Simulated success report prepared.",
-        )
-    else:
-        yield from step(
-            "failure",
-            "Simulated failure report prepared: repair budget exhausted.",
-        )
-
-    yield event(
-        "log",
-        "success",
-        "Demo event collection completed in session memory.",
-    )
-
-    yield make_event(
-        "entry",
-        "success",
-        f"Frontend received the final outcome: {outcome}.",
-        retry_count,
-        outcome=outcome,
-    )
-
-def apply_event(event: dict[str, Any]) -> None:
-    """Update component states and retain every event."""
-    view = st.session_state["view"]
-
-    if event["node"] == "execute" and event["status"] == "running":
-        retry_components = (
-            "api",
-            "cache",
-            "sources",
-            "snapshots",
-            "sandbox",
-            "staging",
-            "validate",
-            "metadata",
-        )
-
-        for node in retry_components:
-            view["statuses"][node] = "pending"
-
-    view["statuses"][event["node"]] = event["status"]
-    view["retry_count"] = event["retry_count"]
-    view["events"].append(event)
-    view["outcome"] = event["outcome"] or "running"
-
-    st.session_state["view"] = view
-
-def render_dashboard() -> None:
-    """Keep the diagram's position and identity stable while events arrive."""
-    view = st.session_state["view"]
-    outcome_column, retry_column, event_column = st.columns(3)
-    outcome_column.metric("Run outcome", view["outcome"].capitalize())
-    retry_column.metric("Repairs attempted", f"{view['retry_count']} / {MAX_RETRIES}")
-    event_column.metric("Events received", len(view["events"]))
-
-    # Fixed geometry prevents multiline activity and terminal messages from
-    # moving the diagram up and down as the run progresses.
-    with st.container(height=100, border=False):
-        active = [
-            STAGES[node] for node, status in view["statuses"].items()
-            if status == "running"
-        ]
-        if view["outcome"] == "success":
-            st.success("Simulation completed successfully.")
-        elif view["outcome"] == "failed":
-            st.error("Simulation failed after three repairs. The failure report was prepared.")
-        elif active:
-            st.info("Active components: " + " · ".join(active))
-        else:
-            st.info("Ready to run the simulation.")
-
-    st.subheader("Live pipeline architecture")
-    render_flow(view["statuses"])
-
-    st.subheader("Live event log")
-    st.caption("Latest 20 events; full history remains in session state.")
-    st.dataframe(view["events"][-20:], width="stretch", hide_index=True, height=280)
+def start_run(request: str, provider: str) -> None:
+    """Run blocking tools off the UI thread, forwarding real events through a queue."""
+    messages = queue.Queue()
+    selected = replace(settings, provider=provider)
+    st.session_state["run_queue"] = messages
+    st.session_state["result"] = {}
+    st.session_state["view"] = view_from_result({"status": "running", "user_request": request})
+    def worker():
+        from agent.graph import run_pipeline
+        try:
+            result = run_pipeline(request, selected, on_event=lambda event: messages.put(("event", event)))
+            messages.put(("result", result))
+        except Exception as error:
+            messages.put(("result", {"status": "failed", "errors": [str(error)],
+                                     "user_request": request, "final_report": f"# Pipeline failed\n\n{error}"}))
+    thread = threading.Thread(target=worker, daemon=True, name="flowpilot-run")
+    st.session_state["run_thread"] = thread
+    thread.start()
 
 
-if "view" not in st.session_state:
-    st.session_state["view"] = new_view()
-
+if st.session_state.get("app_version") != 3:
+    st.session_state["app_version"] = 3
+    st.session_state["result"] = latest_result()
+    st.session_state["view"] = view_from_result(st.session_state["result"])
 
 st.title("FlowPilot")
-st.caption("Self-healing data pipeline • Live workflow preview")
-
-st.warning(
-    "Simulation mode: no API calls, LLM calls, generated-code execution, "
-    "or database writes occur."
-)
-
-request = st.text_area(
-    "What should the pipeline do?",
-    value=(
-        "Track daily weather and air quality for Bengaluru "
-        "and flag anomalies."
-    ),
-)
-
-provider = st.selectbox(
-    "LLM provider — preview selection only",
-    ("ollama", "gemini", "groq"),
-    help="No provider is contacted during the simulation.",
-)
-
-scenario = st.selectbox(
-    "Simulation scenario",
-    (
-        "Success",
-        "Recover after one failure",
-        "Exhaust retries",
-    ),
-)
-
-run_clicked = st.button(
-    "Run simulation",
-    type="primary",
-    disabled=not request.strip(),
-)
-
-st.caption(
-    "The request is displayed as context in this preview. "
-    "Leave controls unchanged while the simulation runs."
-)
-
-if run_clicked:
-    previous = st.session_state.pop("_flow_events", None)
-    if previous is not None:
-        previous.close()
-    st.session_state["view"] = new_view(request.strip())
-    st.session_state["view"]["outcome"] = "running"
-    st.session_state["_flow_events"] = simulate_pipeline(scenario)
+st.caption("Real environmental data engineering · Bronze → Silver → Gold · Bengaluru hourly")
+with st.sidebar:
+    st.header("Pipeline controls")
+    provider = st.selectbox("Planning and repair engine", ("builtin", "ollama", "gemini", "groq"),
+                           index=("builtin", "ollama", "gemini", "groq").index(settings.provider))
+    st.caption("Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
+    request = st.text_area("Data request", value=DEFAULT_REQUEST, height=130)
+    running = "run_queue" in st.session_state
+    if st.button("Run real pipeline", type="primary", disabled=running or not request.strip()):
+        start_run(request.strip(), provider)
+        st.rerun()
+    if st.button("Load latest scheduled result", disabled=running):
+        st.session_state["result"] = latest_result()
+        st.session_state["view"] = view_from_result(st.session_state["result"])
+        st.rerun()
+    st.divider()
+    st.subheader("Scheduled automation")
+    schedule = scheduler_status(settings)
+    st.write("Service:", schedule.get("status", "not_started"))
+    frequency = schedule.get("frequency", settings.schedule_frequency)
+    cadence = "Every hour, at minute 00" if frequency == "hourly" else schedule.get("schedule", settings.schedule_time)
+    st.caption(f"Schedule: {cadence} · {schedule.get("timezone", settings.schedule_timezone)}")
+    if schedule.get("next_run_utc"):
+        st.write("Next run:", pd.Timestamp(schedule["next_run_utc"]).tz_convert(settings.schedule_timezone).strftime("%d %b %Y, %H:%M %Z"))
+    if schedule.get("last_run"):
+        st.json(schedule["last_run"])
+    st.caption("Automatic runs need this computer awake and the project drive mounted. The UI may be closed.")
 
 
-@st.fragment(run_every=0.2 if "_flow_events" in st.session_state else None)
-def live_dashboard() -> None:
-    """Advance one event per tick without reconstructing the surrounding page."""
-    stream = st.session_state.get("_flow_events")
+@st.fragment(run_every=0.2 if "run_queue" in st.session_state else None)
+def live_dashboard():
+    """Consume actual events while retaining one SVG and a fixed status region."""
+    view = st.session_state["view"]
     finished = False
-    if stream is not None:
-        try:
-            event = next(stream)
-        except StopIteration:
-            del st.session_state["_flow_events"]
-            finished = True
-        else:
-            apply_event(event)
-            if event["outcome"] is not None:
-                stream.close()
-                del st.session_state["_flow_events"]
+    messages = st.session_state.get("run_queue")
+    if messages is not None:
+        # Limit batches to retain visible transitions without inventing delays.
+        for _ in range(3):
+            try:
+                kind, item = messages.get_nowait()
+            except queue.Empty:
+                break
+            if kind == "result":
+                st.session_state["result"] = item
+                view["outcome"] = item["status"]
+                del st.session_state["run_queue"]
                 finished = True
-    render_dashboard()
+                break
+            node = item["node"]
+            if node == "execute" and item["status"] == "running":
+                for name in ("api", "cache", "sources", "snapshots", "sandbox", "staging", "validate", "metadata"):
+                    view["statuses"][name] = "pending"
+            if node in view["statuses"]:
+                view["statuses"][node] = item["status"]
+            view["events"].append(item)
+            view["retry_count"] = item["retry_count"]
+            view["outcome"] = item.get("outcome") or "running"
+    a, b, c = st.columns(3)
+    a.metric("Run outcome", view["outcome"].capitalize())
+    b.metric("Repair attempts", f"{view['retry_count']} / 3")
+    c.metric("Real tool events", len(view["events"]))
+    with st.container(height=100, border=False):
+        if view["outcome"] == "success":
+            st.success("Real data validated, published, and analyzed. Results are below the live flow.")
+        elif view["outcome"] in {"failed", "partial"}:
+            st.error("Run " + view["outcome"] + ". Review the report and errors; previously validated data is preserved.")
+        else:
+            active = [NODE_LABELS[n] for n, v in view["statuses"].items() if v == "running"]
+            st.info("Active: " + " · ".join(active) if active else "Ready to fetch real Open-Meteo data.")
+    st.subheader("Live pipeline architecture")
+    render_flow(view["statuses"])
+    with st.expander("Live event log", expanded=bool(messages)):
+        columns = ("timestamp", "node", "status", "message", "retry_count", "duration")
+        st.dataframe([{k: e.get(k) for k in columns} for e in view["events"][-40:]],
+                     width="stretch", hide_index=True, height=280)
     if finished:
-        # One final full rerun stops the fragment timer. The component keeps
-        # the same key and DOM position, including across subsequent runs.
         st.rerun()
 
 
 live_dashboard()
+if "run_queue" not in st.session_state:
+    render_results(st.session_state["result"], settings)

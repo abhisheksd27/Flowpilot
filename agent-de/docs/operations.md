@@ -1,49 +1,25 @@
-# Operations and Troubleshooting
+# Operations
 
-This document describes the intended application behavior. Only configuration, API/cache, and provider starters currently exist.
+```bash
+python main.py run --provider builtin
+python main.py preview
+python main.py status
+python main.py watch --frequency hourly --at 08:00 --timezone Asia/Kolkata
+python main.py schedule --install --provider builtin --frequency hourly --at 08:00 --timezone Asia/Kolkata
+```
 
-## Running and rerunning
+The final command installs a macOS per-user LaunchAgent, `com.flowpilot.environment-pipeline`. It runs independently of Streamlit and starts at login. The computer must be awake and the external project drive mounted. An overdue scheduled execution catches up once after waking/restarting; it does not replay every missed day. The rolling fetch covers five prior days; longer outages require a separate backfill extension.
 
-Use one writer at a time. Select the provider, submit a supported request, inspect the plan and live node log, and review validation before interpreting anomaly results. The CLI and UI entry points are planned in the [README](../README.md).
+A single-daemon lock prevents duplicate schedulers; a warehouse lock serializes jobs. Setup/lock exceptions retry after 15 minutes. A completed pipeline failure is retained for review and the next normal daily run is scheduled. Inspect data/scheduler/status.json and ~/Library/Logs/FlowPilot/service.log and service.err.log.
 
-A rerun with the same dataset definition and input keys must not create duplicates. Distinguish a refreshed API request from a fresh graph run: the latter may reuse a valid cache entry. Record API cache age in the report when it matters to freshness.
+Stop the macOS service:
 
-Scheduling suggestions are informational. Automatic recurring execution is future work.
+```bash
+launchctl bootout gui/$(id -u)/com.flowpilot.environment-pipeline
+```
 
-## Logs
+Remove its plist from ~/Library/LaunchAgents to prevent subsequent login startup. Linux users can supervise `main.py watch` with their process manager and Docker backend.
 
-One planned log file per run: `data/logs/run_<id>.jsonl`.
+Artifacts: data/pipeline.duckdb, data/bronze, data/runs, data/logs, data/reports, data/latest.json. Back up the warehouse only when no writer is active. Retention is manual; snapshots and logs accumulate. Cache expiry is automatic, file cleanup is not. Rerunning an overlapping window updates matching business keys without duplicates. Never remove lock files while processes hold them.
 
-Each event contains timestamp in UTC, run ID, node, action summary, tool, sanitized arguments, result summary, error, graph retry count, transport retry count, and duration. Include token and cache counters with a documented convention: cumulative totals plus per-event deltas, or clearly labeled cumulative totals only.
-
-For compatibility with the requirement's `thought_summary` field, store a short observable action or diagnosis summary. Do not store private model reasoning. Example: “Validation found 12 duplicate business keys; requested a deduplication repair.”
-
-Log schema decisions and publication outcomes explicitly. Bound sampled rows and error text. Never log `.env` contents, full settings with keys, authorization headers, or secrets passed to providers.
-
-## Artifacts
-
-Staging databases and source snapshots belong to the corresponding run/attempt directory. Keep failed-attempt artifacts long enough for diagnosis, with retention configured before unattended use. Do not delete an active run's files.
-
-Stop writers before backing up the warehouse. Keep a compatible data/metadata backup and avoid copying an actively changing database as if it were a consistent snapshot. Archive previous schemas/tables when applying migrations that could lose information.
-
-## Troubleshooting
-
-| Symptom | Investigate | Action |
-| --- | --- | --- |
-| Import error | Active interpreter and installed dependencies | Activate project environment and verify imports |
-| Missing provider key | Selected provider and `.env` precedence | Configure only the chosen hosted provider |
-| Model not found | Configured model and account/local availability | Select an available model and rerun deliberately |
-| Ollama connection error | Local service and configured address | Start/check the service and installed model |
-| Rate limit | HTTP status, usage, cache misses, retry count | Respect provider limits and avoid unbounded reruns |
-| Unexpected cached answer | Request key, TTL, and prompt context | Inspect the relevant cache entry and failure-aware prompt |
-| API shape failure | Snapshot, source error flag, required hourly keys | Diagnose source shape; preserve original evidence |
-| Schema drift | Stored baseline and incoming diff | Review mapping or migration; do not blindly accept |
-| Freshness failure | Source time semantics, timezone, cache age | Correct the plan or refresh input; retain meaningful checks |
-| Sandbox unavailable | Isolation backend setup | Configure a supported backend; do not bypass isolation |
-| DuckDB conflict | Another active writer/connection | Serialize writes and close completed connections |
-| Retry limit reached | Last failure and previous fixes | Report unresolved cause and preserve good data |
-| No anomaly flags | Sample count, spread, thresholds, baseline | Distinguish no flags from insufficient or degenerate data |
-
-## Release checks
-
-Before calling the project complete, verify the documented entry points, offline suite, actual sandbox integration, at least one chosen live provider/source smoke run, report download, idempotent rerun, and an unrecoverable failure path. Report unavailable live credentials as unverified integration, not a successful test.
+Hourly is now the default local cadence, at minute 00 in Asia/Kolkata. Use `--frequency daily --at 08:00` to restore daily operation. See [cloud hosting](hosting.md) for the independent free hourly cloud pipeline and public dashboard.
