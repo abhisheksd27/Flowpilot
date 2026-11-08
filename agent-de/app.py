@@ -68,7 +68,7 @@ if st.session_state.get("app_version") != 3:
 st.markdown("""<style>
 .stApp {background:#080f1f;color:#e2e8f0}
 [data-testid="stSidebar"] {background:#101c2e}
-.block-container {padding-top:2rem;max-width:1400px}
+.block-container {padding-top:4.5rem;max-width:1400px}
 .fp-hero {padding:28px 32px;border:1px solid #284159;border-radius:18px;background:linear-gradient(120deg,#122a38,#101b30);margin-bottom:22px}
 .fp-kicker {color:#75dfc3;font-size:12px;letter-spacing:2px;text-transform:uppercase}
 .fp-hero h1 {font-size:44px;letter-spacing:-1.5px;margin:8px 0}
@@ -90,7 +90,7 @@ with st.expander("What does this do — and how is it useful?", expanded=False):
 The sources provide modeled estimates, not direct sensor readings. An anomaly is a signal to investigate, not a confirmed incident.""")
 with st.sidebar:
     st.header("Your workspace")
-    st.caption("1. Describe your request. 2. Refresh the data. 3. Explore the results.")
+    st.caption("Describe your request → refresh the data → explore the results.")
     provider = st.selectbox("Processing engine", ("builtin", "ollama", "gemini", "groq"),
                            index=("builtin", "ollama", "gemini", "groq").index(settings.provider),
                            format_func=lambda value: {"builtin": "Built-in · no API key needed", "ollama": "Ollama · local model", "gemini": "Gemini", "groq": "Groq"}[value])
@@ -114,7 +114,9 @@ with st.sidebar:
     if schedule.get("next_run_utc"):
         st.write("Next run:", pd.Timestamp(schedule["next_run_utc"]).tz_convert(settings.schedule_timezone).strftime("%d %b %Y, %H:%M %Z"))
     if schedule.get("last_run"):
-        st.json(schedule["last_run"])
+        last_run = schedule["last_run"]
+        finished = pd.Timestamp(last_run["finished_at"]).tz_convert(settings.schedule_timezone).strftime("%d %b, %H:%M %Z")
+        st.caption(f"Last automatic update: {finished} · {last_run['status']}")
     st.caption("Automatic runs need this computer awake and the project drive mounted. The UI may be closed.")
 
 
