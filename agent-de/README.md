@@ -1,5 +1,15 @@
 # FlowPilot
 
+**For interview demos:** start with the [local interview guide](docs/interview.md). It covers free setup without Docker or API keys, stop/restart behavior, saved data, hourly background runs, and the current-temperature question field.
+
+Quick launch after installing dependencies:
+
+```bash
+DEMO_MODE=true LLM_PROVIDER=builtin streamlit run app.py
+```
+
+Ask “What is the current temperature in Bangalore?” in the main question field and click **Get temperature** for a fresh modeled reading with its timestamp. Use the sidebar to run the complete validated weather and air-quality pipeline.
+
 A working local data engineering agent for daily Bengaluru weather and air quality. It fetches real Open-Meteo data, preserves raw inputs, builds validated DuckDB hourly and daily tables, attempts bounded repairs, flags statistical anomalies, and produces an attributable report. The dark live frontend animates actual workflow events.
 
 The default built-in engine runs without model credentials. Gemini, Groq and Ollama can generate plans/code inside the same validated catalog and sandbox boundaries.

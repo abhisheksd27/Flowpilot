@@ -95,6 +95,25 @@ with st.expander("What does this do — and how is it useful?", expanded=False):
 **A visible learning tool.** Follow the flow below to see how a real data pipeline collects, checks, stores, and analyzes information.
 
 The sources provide modeled estimates, not direct sensor readings. An anomaly is a signal to investigate, not a confirmed incident.""")
+st.subheader("Ask about current temperature")
+with st.form("temperature-question"):
+    question = st.text_input("Your question", "What is the current temperature in Bangalore?", max_chars=300)
+    ask = st.form_submit_button("Get temperature")
+if ask:
+    try:
+        from pipeline.current_weather import answer_temperature
+        with st.spinner("Fetching current weather…"):
+            st.session_state['temperature_answer'] = answer_temperature(question, settings)
+        st.session_state.pop('temperature_error', None)
+    except Exception as error:
+        st.session_state.pop('temperature_answer', None)
+        st.session_state['temperature_error'] = str(error)
+if st.session_state.get('temperature_error'):
+    st.error(st.session_state['temperature_error'])
+if st.session_state.get('temperature_answer'):
+    answer = st.session_state['temperature_answer']
+    st.success(f"The current modeled temperature in {answer['city']} is {answer['temperature']:.1f} {answer['unit']}.")
+    st.caption(f"Source: Open-Meteo · Measurement time: {answer['time']} ({answer['timezone']}) · Fetched fresh when you clicked Get temperature. This answer does not run or update the warehouse pipeline.")
 with st.sidebar:
     st.header("Your workspace")
     st.caption("Choose a city, describe what you need, then refresh the data.")

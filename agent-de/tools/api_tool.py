@@ -34,7 +34,7 @@ class APITool:
         """Retry transient failures and malformed bodies, never caching a failed response."""
         check_url(url)
         allowed = {"name", "count", "language", "format"} if "geocoding" in url else {
-            "latitude", "longitude", "hourly", "past_days", "forecast_days", "timezone"}
+            "latitude", "longitude", "hourly", "current", "past_days", "forecast_days", "timezone"}
         if set(params) - allowed:
             raise ValueError("API parameters outside the supported catalog")
         key = digest([url, params])
