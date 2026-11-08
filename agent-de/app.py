@@ -73,15 +73,15 @@ st.markdown("""<style>
 .stApp {background:#080f1f;color:#e2e8f0}
 [data-testid="stSidebar"] {background:#101c2e}
 .block-container {padding-top:4.5rem;max-width:1400px}
-.fp-hero {padding:28px 32px;border:1px solid #284159;border-radius:18px;background:linear-gradient(120deg,#122a38,#101b30);margin-bottom:22px}
+.fp-hero {padding:28px 32px;border:1px solid #284159;border-radius:4px;background:#101c22;margin-bottom:22px}
 .fp-kicker {color:#75dfc3;font-size:12px;letter-spacing:2px;text-transform:uppercase}
-.fp-hero h1 {font-size:44px;letter-spacing:-1.5px;margin:8px 0}
-.fp-hero p {max-width:850px;color:#b6c7db;font-size:17px;line-height:1.7}
-[data-testid="stMetric"] {background:#101e31;border:1px solid #27394f;border-radius:12px;padding:16px}
+.fp-hero h1 {font-size:32px;letter-spacing:-1.5px;margin:8px 0}
+.fp-hero p {max-width:850px;color:#b6c7db;font-size:15px;line-height:1.7}
+[data-testid="stMetric"] {background:#101e31;border:1px solid #27394f;border-radius:4px;padding:16px}
 button:focus-visible,a:focus-visible {outline:3px solid #7dd3fc;outline-offset:3px}
 @media(max-width:650px){.fp-hero{padding:20px}.fp-hero h1{font-size:34px}}
-</style><section class="fp-hero"><div class="fp-kicker">Your environmental data, kept up to date</div>
-<h1>Meet FlowPilot.</h1><p>Track your city’s weather and air quality without collecting or cleaning data by hand. FlowPilot gathers hourly measurements, checks their quality, repairs supported data issues, and highlights unusual changes.</p></section>""", unsafe_allow_html=True)
+</style><section class="fp-hero"><div class="fp-kicker">Weather & air quality</div>
+<h1>FlowPilot</h1><p>Hourly weather and air-quality records for your city, checked for missing values and unusual changes.</p></section>""", unsafe_allow_html=True)
 with st.expander("What does this do — and how is it useful?", expanded=False):
     st.markdown("""**Less manual work.** Fresh data arrives automatically, ready for analysis and reporting.
 
