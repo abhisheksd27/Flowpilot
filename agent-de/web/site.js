@@ -1,4 +1,49 @@
 import renderFlow from './flow.bundle.js';
+const githubApi = 'https://api.github.com/repos/abhisheksd27/Flowpilot';
+async function requestJson(path) {
+  const response = await fetch(githubApi + path, {cache: 'no-store', headers: {Accept: 'application/vnd.github+json'}});
+  if (!response.ok) throw new Error(response.status === 403 || response.status === 429 ? 'GitHub request limit reached. Please try again later.' : `GitHub returned ${response.status}`);
+  return response.json();
+}
+async function loadRequestReports() {
+  const status = document.getElementById('request-status');
+  const container = document.getElementById('request-reports');
+  status.textContent = 'Checking recent requests…';
+  try {
+    const issues = await requestJson('/issues?state=all&sort=created&direction=desc&per_page=50');
+    const requests = issues.filter(issue => !issue.pull_request && issue.title.startsWith('[Pipeline request]')).slice(0, 5);
+    const entries = await Promise.all(requests.map(async issue => {
+      const comments = issue.comments ? await requestJson(`/issues/${issue.number}/comments?per_page=100`) : [];
+      const report = comments.filter(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.includes('Run logs and downloadable results')).at(-1);
+      const details = document.createElement('details');
+      details.className = 'card';
+      const summary = document.createElement('summary');
+      summary.textContent = `#${issue.number} · ${issue.title.replace('[Pipeline request]', '').trim()} · ${report ? 'Report available' : 'Awaiting report'}`;
+      const request = document.createElement('p');
+      request.textContent = issue.body;
+      const body = document.createElement('pre');
+      body.style.whiteSpace = 'pre-wrap';
+      body.textContent = report ? report.body : 'Processing may be queued or running. Open the request to check its activity.';
+      const link = document.createElement('a');
+      link.href = issue.html_url;
+      link.textContent = 'Open full request and download links ↗';
+      details.append(summary, request, body, link);
+      return details;
+    }));
+    container.replaceChildren(...entries);
+    status.textContent = `${entries.length} recent requests · Checked ${new Date().toLocaleTimeString()}`;
+  } catch (error) {
+    status.textContent = 'Unable to refresh request reports: ' + error.message + ' · You can still open requests on GitHub using the link above.';
+  }
+}
+document.getElementById('refresh-dashboard').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.textContent = 'Refreshing…';
+  try { await Promise.all([load(), loadRequestReports()]); }
+  finally { button.disabled = false; button.textContent = 'Refresh dashboard'; }
+});
+loadRequestReports();
 document.getElementById('request-form').addEventListener('submit', event => {
   event.preventDefault();
   const request = document.getElementById('request-text').value.trim();
