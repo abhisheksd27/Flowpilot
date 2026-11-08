@@ -11,10 +11,7 @@ class CityAPI(ScenarioAPI):
     def call_api(self, url, params, **kwargs):
         response = super().call_api(url, params, **kwargs)
         if url == GEO:
-            city = params['name']
-            response['results'][0].update(name=city, id=1 if city == 'Bengaluru' else 2)
-            # The wrong-country namesake must never be selected for the catalog.
-            response['results'].insert(0, dict(response['results'][0], country='Pakistan', country_code='PK', id=999))
+            raise AssertionError('Catalog cities must not need a live geocoding lookup')
         return response
 
 

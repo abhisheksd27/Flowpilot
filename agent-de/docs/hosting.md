@@ -15,3 +15,5 @@ Sources: [Actions billing](https://docs.github.com/en/billing/concepts/product-b
 ## City selection
 
 The public dashboard supports Bengaluru, Mumbai, Delhi, Chennai, Hyderabad, and Kolkata. Each hourly cloud job processes all six sequentially and publishes independently filtered results, charts, quality checks and flow events. One city's failure does not prevent attempts for the others. Selection displays saved results; it does not trigger public compute. Local Streamlit offers the same selector and a manual refresh for the selected city. The existing local hourly daemon continues tracking Bengaluru.
+
+Supported city coordinates are pinned from verified Open-Meteo geocoding results (8 November 2026), avoiding ambiguous names and unnecessary hourly geocoding requests. Weather and air-quality measurements are still fetched fresh on every scheduled run.

@@ -58,16 +58,16 @@ class Pipeline:
                 last_error = str(error)
                 if attempt == self.settings.max_retries:
                     raise
+        from pipeline.cities import LOCATIONS
         with self.log.operation("api", "Resolve requested city", args={"city": plan["city"]}):
-            results = self.api.call_api(GEO, {"name": plan["city"], "count": 5, "language": "en", "format": "json"}).get("results", [])
-            if not results:
-                raise ValueError("Geocoding found no matching city")
-            from pipeline.cities import CITIES
-            if plan["city"] in CITIES:
-                results = [item for item in results if item.get("country_code") == "IN" or item.get("country") == "India"]
+            catalog = next((value for name, value in LOCATIONS.items() if name.casefold() == plan["city"].casefold()), None)
+            if catalog:
+                location = dict(catalog)
+            else:
+                results = self.api.call_api(GEO, {"name": plan["city"], "count": 5, "language": "en", "format": "json"}).get("results", [])
                 if not results:
-                    raise ValueError("No matching city in India")
-            location = results[0]
+                    raise ValueError("Geocoding found no matching city")
+                location = results[0]
         ZoneInfo(location["timezone"])
         now = self.started_at
         plan.update({"city": location["name"], "location_id": str(location["id"]),

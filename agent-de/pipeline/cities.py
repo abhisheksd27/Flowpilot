@@ -3,7 +3,10 @@ import json
 from config import Settings
 from pipeline.events import write_json
 
-CITIES = ('Bengaluru', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Kolkata')
+# Coordinates verified against Open-Meteo geocoding on 2026-11-08.
+# Stable catalog cities need no repeated network lookup on hourly runs.
+LOCATIONS = {'Bengaluru': {'id': 1277333, 'name': 'Bengaluru', 'latitude': 12.97194, 'longitude': 77.59369, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}, 'Mumbai': {'id': 1275339, 'name': 'Mumbai', 'latitude': 19.07283, 'longitude': 72.88261, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}, 'Delhi': {'id': 1273294, 'name': 'Delhi', 'latitude': 28.65195, 'longitude': 77.23149, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}, 'Chennai': {'id': 1264527, 'name': 'Chennai', 'latitude': 13.08784, 'longitude': 80.27847, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}, 'Hyderabad': {'id': 1269843, 'name': 'Hyderabad', 'latitude': 17.38405, 'longitude': 78.45636, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}, 'Kolkata': {'id': 1275004, 'name': 'Kolkata', 'latitude': 22.56263, 'longitude': 88.36304, 'timezone': 'Asia/Kolkata', 'country': 'India', 'country_code': 'IN'}}
+CITIES = tuple(LOCATIONS)
 
 
 def city_request(city):
