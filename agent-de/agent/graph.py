@@ -1,6 +1,7 @@
 """LangGraph pipeline with real tools, immutable raw snapshots, and bounded repairs."""
 from datetime import datetime, timedelta, timezone
 import json
+import re
 from pathlib import Path
 import time
 import uuid
@@ -21,6 +22,12 @@ from tools.schema_tool import source_schema, expected_schema, compare_schema
 from tools.validate_tool import validate_data
 from tools.anomaly_tool import detect_anomalies
 from tools.sql_tool import connection
+
+
+def normalize_generated_code(code: str) -> str:
+    """Accept a single Markdown code fence from compliant-but-chatty local models."""
+    match = re.fullmatch(r"\s*```(?:python)?\s*\n(.*?)\n```\s*", code, re.DOTALL | re.IGNORECASE)
+    return match.group(1) if match else code
 
 
 class Pipeline:
@@ -84,6 +91,8 @@ class Pipeline:
                 code = self.model(CODE_SYSTEM, {"task": "generate_code", "instructions": CODE_GEN_PROMPT,
                     "plan": state["plan"], "reference_code": transform_code(),
                     "previous_errors": state["errors"]}, json_mode=False)
+                # Keep prose invalid; accept only a complete outer code fence.
+                code = normalize_generated_code(code)
                 validate_code(code)
                 state["code"] = code
                 return state

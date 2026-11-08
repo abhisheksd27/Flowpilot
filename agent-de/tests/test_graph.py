@@ -1,12 +1,18 @@
 """Offline graph contracts and transactional preservation."""
 from dataclasses import replace
 import json
-from agent.graph import run_pipeline
+from agent.graph import normalize_generated_code, run_pipeline
 from config import Settings
 from pipeline.warehouse import run_lock
 from tests.failure_injection.scenarios import ScenarioAPI, fixture_executor
 from tools.sql_tool import connection
 import pytest
+
+
+def test_normalize_generated_code_accepts_a_complete_python_fence():
+    assert normalize_generated_code("```python\nvalue = 1\n```") == "value = 1"
+    assert normalize_generated_code("Explanation\n```python\nvalue = 1\n```") == "Explanation\n```python\nvalue = 1\n```"
+
 
 
 def test_real_transform_and_idempotency(tmp_path):
