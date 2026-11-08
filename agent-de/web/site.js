@@ -1,4 +1,16 @@
 import renderFlow from './flow.bundle.js';
+document.getElementById('request-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const request = document.getElementById('request-text').value.trim();
+  if (!request) return;
+  const url = new URL('https://github.com/abhisheksd27/Flowpilot/issues/new');
+  url.searchParams.set('title', '[Pipeline request] Weather analysis');
+  url.searchParams.set('body', request);
+  window.location.assign(url.toString());
+});
+document.getElementById('city').addEventListener('change', event => {
+  document.getElementById('request-text').value = `Track daily weather and air quality for ${event.target.value} and flag anomalies.`;
+});
 const $=id=>document.getElementById(id);let data,timer,bundle;
 function table(id, rows, keys){const t=document.createElement('table'),head=t.createTHead().insertRow();keys.forEach(k=>{const c=document.createElement('th');c.textContent=({temperature_c:'Temperature (°C)',humidity_pct:'Humidity (%)',pm2_5_ug_m3:'PM2.5 (µg/m³)',complete_day:'Day coverage',passed:'Result',check:'Quality check',samples:'Hours recorded',date:'Date',city:'City',detail:'What we checked'})[k]??k.replaceAll('_',' ');head.append(c)});const b=t.createTBody();for(const r of rows){const row=b.insertRow();for(const k of keys){const c=row.insertCell();c.textContent=k==='complete_day'?(r[k]?'Complete':'Partial day'):k==='passed'?(r[k]?'Passed':'Needs attention'):k==='date'?String(r[k]??'').slice(0,10):typeof r[k]==='number'?Number(r[k].toFixed(2)):String(r[k]??'—');if(typeof r[k]==='boolean')c.dataset.result=String(r[k])}}$(id).replaceChildren(t)}
 function flow(statuses){renderFlow({parentElement:$('architecture'),data:{diagram:data.diagram,nodeIds:data.nodeIds,statuses}})}

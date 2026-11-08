@@ -1,0 +1,52 @@
+name: Process public pipeline request
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: public-pipeline-requests
+  cancel-in-progress: false
+jobs:
+  request:
+    if: startsWith(github.event.issue.title, '[Pipeline request]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: agent-de
+    env:
+      LLM_PROVIDER: builtin
+      SANDBOX_BACKEND: docker
+      SANDBOX_IMAGE: agent-de-sandbox:local
+      OPENBLAS_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: agent-de/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: docker build -f Dockerfile.sandbox -t agent-de-sandbox:local .
+      - name: Run validated public request
+        run: python -m pipeline.public_request
+      - name: Save results and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: request-${{ github.event.issue.number }}
+          path: |
+            agent-de/data/reports/
+            agent-de/data/runs/
+          retention-days: 7
+      - name: Reply with results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const p = 'agent-de/data/public-response.md';
+            const report = fs.existsSync(p) ? fs.readFileSync(p, 'utf8').slice(0, 24000) : 'The job could not finish. Open the run log for details.';
+            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body: report + '\n\n[Run logs and downloadable results](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + ')\n\nResults are public. Downloadable files are retained for seven days.'});
