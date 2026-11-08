@@ -98,14 +98,16 @@ The sources provide modeled estimates, not direct sensor readings. An anomaly is
 with st.sidebar:
     st.header("Your workspace")
     st.caption("Choose a city, describe what you need, then refresh the data.")
-    provider = st.selectbox("Processing engine", ("builtin", "ollama", "gemini", "groq"),
-                           index=("builtin", "ollama", "gemini", "groq").index(settings.provider),
+    engines = ("builtin",) if settings.demo_mode else ("builtin", "ollama", "gemini", "groq")
+    provider = st.selectbox("Processing engine", engines,
+                           index=engines.index("builtin" if settings.demo_mode else settings.provider),
                            format_func=lambda value: {"builtin": "Built-in · no API key needed", "ollama": "Ollama · local model", "gemini": "Gemini", "groq": "Groq"}[value])
-    st.caption("Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
+    st.caption("Free interview demo · real data and trusted transformations. AI engines can be enabled on a server with Docker." if settings.demo_mode else "Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
     request = st.text_area(
         "What would you like to track?",
         key="request_text",
         height=90,
+        disabled="run_queue" in st.session_state,
         placeholder=f"Example: Track daily weather and air quality for {selected_city} and flag anomalies.",
         help="Keep the selected city in your request. FlowPilot currently supports weather, humidity, and air-quality analysis.",
     )
@@ -119,7 +121,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.subheader("Local automation")
-    st.caption("The local schedule tracks Bengaluru. Refresh other cities manually here; the public dashboard updates all six cities hourly.")
+    st.caption("This demo updates when you click Refresh. Free hosting can sleep and reset saved data. The public GitHub dashboard updates hourly." if settings.demo_mode else "The local schedule tracks Bengaluru. Refresh other cities manually here; the public dashboard updates all six cities hourly.")
     schedule = scheduler_status(settings)
     st.write("Status:", {"waiting": "Active · waiting for next update", "running_pipeline": "Updating data", "not_started": "Not started", "stopped": "Stopped", "stale_or_stopped": "Needs attention"}.get(schedule.get("status"), "Unknown"))
     frequency = schedule.get("frequency", settings.schedule_frequency)

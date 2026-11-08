@@ -37,7 +37,13 @@ class Pipeline:
         self.settings = settings
         self.client = client or make_client(settings)
         self.api = api or APITool(settings)
-        self.executor = executor
+        if settings.demo_mode:
+            if settings.provider != 'builtin' or client is not None:
+                raise ValueError('Free demo mode requires the built-in engine')
+            from tools.demo_executor import run_trusted_transform
+            self.executor = run_trusted_transform
+        else:
+            self.executor = executor
         self.run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:8]
         self.directory = settings.data_dir / "runs" / self.run_id
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -129,7 +135,7 @@ class Pipeline:
         baseline = expected_schema(self.settings.db_path, "source:" + plan["location_id"])
         state["schema_drift"] = compare_schema(baseline, state["source_schema"]) if baseline else {"detected": False}
         self.log.emit("snapshots", "success", "Immutable raw responses archived", result={"sources": list(snapshots)})
-        with self.log.operation("sandbox", "Execute generated program inside OS isolation"):
+        with self.log.operation("sandbox", "Apply trusted built-in transformation" if self.settings.demo_mode else "Execute generated program inside OS isolation"):
             result = self.executor(state["code"], settings=self.settings, snapshots=snapshots, plan=plan,
                                    attempt_dir=self.directory / f"attempt_{state['retry_count']}")
             state["execution_result"] = result

@@ -15,7 +15,7 @@ def default_plan(request: str) -> dict:
     """Parse the supported environmental request; disclose a fallback location."""
     if not request.strip():
         raise ValueError("Enter a request")
-    if not re.search(r"weather|temperature|humidity|air quality|pollution|pm2", request, re.I):
+    if not re.search(r"weather|\btemp\b|temperature|humidity|air quality|pollution|pm2", request, re.I):
         raise ValueError("This project supports weather and air-quality requests only")
     match = re.search(r"(?:for|in)\s+([\w ,'-]+?)(?=\s+and\b|[.!?]|$)", request, re.I)
     city = match.group(1).strip() if match else "Bengaluru"

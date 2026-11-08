@@ -26,6 +26,7 @@ class Settings:
     backoff_seconds: float = 1
     sandbox_backend: str = "auto"
     sandbox_image: str = "agent-de-sandbox:local"
+    demo_mode: bool = False
     max_retries: int = 3
     python_timeout: int = 30
     schedule_frequency: str = "hourly"
@@ -66,7 +67,8 @@ class Settings:
             if variable in os.environ:
                 raw = os.environ[variable].strip()
                 default = item.default
-                kwargs[name] = (float(raw) if name in {"http_timeout", "backoff_seconds"}
+                kwargs[name] = (raw.lower() in {"true", "1", "yes"} if isinstance(default, bool)
+                                else float(raw) if name in {"http_timeout", "backoff_seconds"}
                                 else int(raw) if isinstance(default, int) else raw)
         data = Path(kwargs.get("data_dir", ROOT / "data")).expanduser()
         kwargs["data_dir"] = (ROOT / data).resolve()

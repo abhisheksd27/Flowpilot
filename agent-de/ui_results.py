@@ -46,7 +46,7 @@ def render_results(result: dict, settings: Settings) -> None:
         else:
             st.info("Run the real pipeline to produce a plan.")
     with tabs[2]:
-        st.caption("The exact program executed in the isolated staging worker.")
+        st.caption("Built-in transformation template. Demo mode applies its trusted implementation directly, without executing generated code." if settings.demo_mode else "The exact program executed in the isolated staging worker.")
         if result.get("code"):
             st.code(result["code"], language="python")
         else:

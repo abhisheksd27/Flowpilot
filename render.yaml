@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: flowpilot-demo
+    runtime: python
+    plan: free
+    rootDir: agent-de
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: DEMO_MODE
+        value: 'true'
+      - key: LLM_PROVIDER
+        value: builtin
+      - key: OPENBLAS_NUM_THREADS
+        value: '1'
+      - key: OMP_NUM_THREADS
+        value: '1'
