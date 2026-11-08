@@ -51,7 +51,7 @@ FLOWPILOT_SANDBOX_TESTS=1 python -m pytest tests/test_sandbox.py -q
 python -m eval.run_eval
 ```
 
-Verified real Bengaluru ingestion: 139 hourly records, six daily summaries, and zero duplicates on rerun. The deterministic failure evaluation recovered nine of nine injected cases; see [measured results](eval/results.md) and its scope. External model adapters use mocked tests; live model credentials and Docker were not tested. Data is modeled weather/air-quality output, not direct sensor readings.
+Verified real Bengaluru ingestion: 139 hourly records, six daily summaries, and zero duplicates on rerun. The deterministic failure evaluation recovered nine of nine injected cases; see [measured results](eval/results.md) and its scope. External model adapters use mocked tests; live model credentials were not tested. Docker pipeline execution is now verified in GitHub Actions. Data is modeled weather/air-quality output, not direct sensor readings.
 
 ## Documentation
 
@@ -63,3 +63,5 @@ Verified real Bengaluru ingestion: 139 hourly records, six daily summaries, and 
 Runtime data and secrets are ignored by Git. The supported scope is the environmental catalog with a fixed canonical output, single-writer local operation and bounded repair. Missing data is never fabricated. Arbitrary target migrations, long historical backfills and multi-tenant deployment need separate extensions.
 
 Hourly is now the default local cadence, at minute 00 in Asia/Kolkata. Use `--frequency daily --at 08:00` to restore daily operation. See [cloud hosting](docs/hosting.md) for the independent free hourly cloud pipeline and public dashboard.
+
+Public deployment: https://abhisheksd27.github.io/Flowpilot/ — the read-only dashboard updates from hourly cloud jobs at :47 IST. The local Streamlit app retains manual execution and SQL controls.
