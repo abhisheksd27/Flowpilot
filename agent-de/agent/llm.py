@@ -72,28 +72,40 @@ class HTTPClient(LLMClient):
                 if status and 400 <= status < 500 and status != 429:
                     raise RuntimeError(f"{self.provider}: HTTP {status}; check model and API key") from None
                 if attempt == self.settings.max_retries:
-                    raise RuntimeError(f"{self.provider}: request failed ({type(error).__name__})") from None
+                    detail = f"HTTP {status}" if status else type(error).__name__
+                    raise RuntimeError(f"{self.provider}: request failed ({detail})") from None
                 self.metrics["retries"] += 1
                 time.sleep(self.settings.backoff_seconds * 2 ** attempt)
         raise RuntimeError("Unreachable retry state")
 
 
 class GeminiClient(HTTPClient):
-    """Gemini's OpenAI-compatible free-tier endpoint."""
+    """Gemini's native API, including current authorization-key support."""
 
     provider = "gemini"
 
     def request(self, messages: list[dict], json_mode: bool) -> tuple[str, dict, dict]:
         if not self.settings.gemini_key:
             raise ValueError("Set GEMINI_API_KEY in .env")
-        body = {"model": self.settings.gemini_model, "messages": messages, "temperature": 0.1}
+        system = next((message["content"] for message in messages if message["role"] == "system"), "")
+        user = next((message["content"] for message in messages if message["role"] == "user"), "")
+        body = {"systemInstruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {"temperature": 0.1}}
         if json_mode:
-            body["response_format"] = {"type": "json_object"}
-        return ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                {"Authorization": f"Bearer {self.settings.gemini_key}"}, body)
+            body["generationConfig"]["responseMimeType"] = "application/json"
+        return (f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{self.settings.gemini_model}:generateContent",
+                {"x-goog-api-key": self.settings.gemini_key}, body)
+
+    def decode(self, data: dict) -> tuple[str, int, int]:
+        usage = data.get("usageMetadata", {})
+        text = "".join(part.get("text", "") for part in
+                       data["candidates"][0]["content"]["parts"])
+        return text, usage.get("promptTokenCount", 0), usage.get("candidatesTokenCount", 0)
 
 
-class GroqClient(GeminiClient):
+class GroqClient(HTTPClient):
     """Groq's OpenAI-compatible endpoint."""
 
     provider = "groq"

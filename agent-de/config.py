@@ -16,7 +16,7 @@ class Settings:
     provider: str = "builtin"
     gemini_key: str = field(default="", repr=False)
     groq_key: str = field(default="", repr=False)
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     groq_model: str = "llama-3.3-70b-versatile"
     ollama_model: str = "qwen2.5-coder:7b"
     ollama_url: str = "http://localhost:11434"

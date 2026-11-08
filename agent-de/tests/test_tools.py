@@ -75,8 +75,13 @@ def test_cache_corruption_and_expiry(tmp_path):
 @pytest.mark.parametrize("adapter", [GeminiClient, GroqClient, OllamaClient])
 def test_provider_interface_usage_and_cache(adapter, tmp_path, monkeypatch):
     settings = Settings(data_dir=tmp_path, gemini_key="fixture", groq_key="fixture", backoff_seconds=0)
-    body = {"message": {"content": '{"ok":true}'}, "prompt_eval_count": 4, "eval_count": 2} if adapter is OllamaClient else {
-        "choices": [{"message": {"content": '{"ok":true}'}}], "usage": {"prompt_tokens": 4, "completion_tokens": 2}}
+    body = ({"message": {"content": '{"ok":true}'}, "prompt_eval_count": 4, "eval_count": 2}
+            if adapter is OllamaClient else
+            {"candidates": [{"content": {"parts": [{"text": '{"ok":true}'}]}}],
+             "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 2}}
+            if adapter is GeminiClient else
+            {"choices": [{"message": {"content": '{"ok":true}'}}],
+             "usage": {"prompt_tokens": 4, "completion_tokens": 2}})
     response = Mock(status_code=200)
     response.json.return_value = body
     post = Mock(return_value=response)
@@ -96,6 +101,16 @@ def test_provider_backoff_and_missing_key(tmp_path, monkeypatch):
     assert GroqClient(settings).complete("s", "p") == '{}'
     with pytest.raises(ValueError, match="GEMINI_API_KEY"):
         GeminiClient(settings).complete("s", "p")
+
+
+def test_gemini_uses_native_key_header_and_json_mode(tmp_path):
+    settings = Settings(data_dir=tmp_path, gemini_key="AQ_fixture")
+    url, headers, body = GeminiClient(settings).request(
+        [{"role": "system", "content": "system"}, {"role": "user", "content": "prompt"}], True)
+    assert url.endswith("/gemini-3.8-flash:generateContent")
+    assert headers == {"x-goog-api-key": "AQ_fixture"}
+    assert body["systemInstruction"]["parts"][0]["text"] == "system"
+    assert body["generationConfig"]["responseMimeType"] == "application/json"
 
 
 def test_sql_ownership_and_external_access(tmp_path):
