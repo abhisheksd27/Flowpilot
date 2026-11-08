@@ -22,7 +22,7 @@ def render_results(result: dict, settings: Settings) -> None:
             published = result.get("published") or {}
             analyses = result.get("anomalies") or {}
             a, b, c = st.columns(3)
-            a.metric("Hourly records saved", published.get("warehouse_rows", "—"))
+            a.metric("Hours in this update", published.get("hourly_rows", "—"))
             b.metric("Daily summaries", published.get("daily_rows", "—"))
             c.metric("Unusual values flagged", sum(item.get("count", 0) for item in analyses.values()) if analyses else "—")
             frame = preview(settings, "silver_environment", 5000)
@@ -87,6 +87,11 @@ def render_results(result: dict, settings: Settings) -> None:
         table = st.selectbox("Warehouse layer", ("gold_daily_environment", "silver_environment"))
         try:
             frame = preview(settings, table)
+            location = result.get("plan", {}).get("location_id")
+            if location and "location_id" in frame.columns:
+                frame = frame[frame["location_id"] == location]
+            elif not location:
+                frame = frame.iloc[0:0]
             st.dataframe(frame, width="stretch", hide_index=True)
         except Exception as error:
             st.info(f"Warehouse is temporarily busy: {error}")

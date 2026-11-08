@@ -13,19 +13,21 @@ from pipeline.warehouse import preview
 from tools.sql_tool import run_sql
 from ui_flow import NODE_LABELS, render_flow
 from ui_results import render_results
+from pipeline.cities import CITIES, city_result, city_request, run_city
 
 st.set_page_config(page_title="FlowPilot", page_icon="🔄", layout="wide")
 settings = Settings.from_env()
 settings.prepare()
+selected_city = st.sidebar.selectbox("Choose a city", CITIES, disabled="run_queue" in st.session_state)
 
 
 def latest_result() -> dict:
     """Read an atomically saved result, including runs produced by the scheduler."""
-    path = settings.data_dir / "latest.json"
     try:
-        return json.loads(path.read_text()) if path.exists() else {}
+        return city_result(settings, selected_city)
     except (ValueError, OSError):
         return {}
+
 
 
 def view_from_result(result: dict) -> dict:
@@ -40,8 +42,9 @@ def view_from_result(result: dict) -> dict:
     return view
 
 
-def start_run(request: str, provider: str) -> None:
+def start_run(city: str, provider: str) -> None:
     """Run blocking tools off the UI thread, forwarding real events through a queue."""
+    request = city_request(city)
     messages = queue.Queue()
     selected = replace(settings, provider=provider)
     st.session_state["run_queue"] = messages
@@ -50,7 +53,7 @@ def start_run(request: str, provider: str) -> None:
     def worker():
         from agent.graph import run_pipeline
         try:
-            result = run_pipeline(request, selected, on_event=lambda event: messages.put(("event", event)))
+            result = run_city(city, selected, on_event=lambda event: messages.put(("event", event)))
             messages.put(("result", result))
         except Exception as error:
             messages.put(("result", {"status": "failed", "errors": [str(error)],
@@ -60,8 +63,9 @@ def start_run(request: str, provider: str) -> None:
     thread.start()
 
 
-if st.session_state.get("app_version") != 3:
-    st.session_state["app_version"] = 3
+if st.session_state.get("app_version") != 4 or st.session_state.get("result_city") != selected_city:
+    st.session_state["result_city"] = selected_city
+    st.session_state["app_version"] = 4
     st.session_state["result"] = latest_result()
     st.session_state["view"] = view_from_result(st.session_state["result"])
 
@@ -77,7 +81,7 @@ st.markdown("""<style>
 button:focus-visible,a:focus-visible {outline:3px solid #7dd3fc;outline-offset:3px}
 @media(max-width:650px){.fp-hero{padding:20px}.fp-hero h1{font-size:34px}}
 </style><section class="fp-hero"><div class="fp-kicker">Your environmental data, kept up to date</div>
-<h1>Meet FlowPilot.</h1><p>Track Bengaluru’s weather and air quality without collecting or cleaning data by hand. FlowPilot gathers hourly measurements, checks their quality, repairs supported data issues, and highlights unusual changes.</p></section>""", unsafe_allow_html=True)
+<h1>Meet FlowPilot.</h1><p>Track your city’s weather and air quality without collecting or cleaning data by hand. FlowPilot gathers hourly measurements, checks their quality, repairs supported data issues, and highlights unusual changes.</p></section>""", unsafe_allow_html=True)
 with st.expander("What does this do — and how is it useful?", expanded=False):
     st.markdown("""**Less manual work.** Fresh data arrives automatically, ready for analysis and reporting.
 
@@ -95,17 +99,19 @@ with st.sidebar:
                            index=("builtin", "ollama", "gemini", "groq").index(settings.provider),
                            format_func=lambda value: {"builtin": "Built-in · no API key needed", "ollama": "Ollama · local model", "gemini": "Gemini", "groq": "Groq"}[value])
     st.caption("Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
-    request = st.text_area("What would you like to track?", value=DEFAULT_REQUEST, height=130)
+    request = city_request(selected_city)
+    st.caption(f"Tracking temperature, humidity, and PM2.5 for {selected_city}, India.")
     running = "run_queue" in st.session_state
     if st.button("Refresh data now", type="primary", disabled=running or not request.strip()):
-        start_run(request.strip(), provider)
+        start_run(selected_city, provider)
         st.rerun()
     if st.button("Show latest saved results", disabled=running):
         st.session_state["result"] = latest_result()
         st.session_state["view"] = view_from_result(st.session_state["result"])
         st.rerun()
     st.divider()
-    st.subheader("Scheduled automation")
+    st.subheader("Local automation")
+    st.caption("The local schedule tracks Bengaluru. Refresh other cities manually here; the public dashboard updates all six cities hourly.")
     schedule = scheduler_status(settings)
     st.write("Status:", {"waiting": "Active · waiting for next update", "running_pipeline": "Updating data", "not_started": "Not started", "stopped": "Stopped", "stale_or_stopped": "Needs attention"}.get(schedule.get("status"), "Unknown"))
     frequency = schedule.get("frequency", settings.schedule_frequency)
@@ -172,7 +178,7 @@ def live_dashboard():
 
 
 if "run_queue" not in st.session_state:
-    st.subheader("Your latest results")
+    st.subheader(f"Your latest results · {selected_city}")
     result = st.session_state["result"]
     if result:
         st.caption("Latest saved run: " + result.get("run_id", "Unknown") + " · Use ‘Show latest saved results’ after an automatic update.")

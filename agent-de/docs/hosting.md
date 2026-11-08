@@ -11,3 +11,7 @@ Each job restores the last published DuckDB checkpoint, performs validated upser
 The workflow is `.github/workflows/hourly-pipeline.yml` at repository root. Public standard GitHub Actions runners and GitHub Pages can be used without a paid hosting plan; storage, bandwidth, acceptable-use and scheduling limits apply. No LLM secret is required. The 200 MB checkpoint bound stops growth from silently exceeding this deployment design; add retention/archival before that point.
 
 Sources: [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [schedule limits](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+## City selection
+
+The public dashboard supports Bengaluru, Mumbai, Delhi, Chennai, Hyderabad, and Kolkata. Each hourly cloud job processes all six sequentially and publishes independently filtered results, charts, quality checks and flow events. One city's failure does not prevent attempts for the others. Selection displays saved results; it does not trigger public compute. Local Streamlit offers the same selector and a manual refresh for the selected city. The existing local hourly daemon continues tracking Bengaluru.

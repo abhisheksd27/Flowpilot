@@ -62,6 +62,11 @@ class Pipeline:
             results = self.api.call_api(GEO, {"name": plan["city"], "count": 5, "language": "en", "format": "json"}).get("results", [])
             if not results:
                 raise ValueError("Geocoding found no matching city")
+            from pipeline.cities import CITIES
+            if plan["city"] in CITIES:
+                results = [item for item in results if item.get("country_code") == "IN" or item.get("country") == "India"]
+                if not results:
+                    raise ValueError("No matching city in India")
             location = results[0]
         ZoneInfo(location["timezone"])
         now = self.started_at

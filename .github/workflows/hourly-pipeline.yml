@@ -1,4 +1,4 @@
-name: Hourly Bengaluru pipeline and dashboard
+name: Hourly city pipelines and dashboard
 on:
   schedule:
     - cron: '17 * * * *'
@@ -62,7 +62,7 @@ jobs:
       - name: Fetch, validate, repair, publish and analyze
         id: run
         continue-on-error: true
-        run: python main.py run --provider builtin
+        run: python -m pipeline.cities
       - name: Export public dashboard and warehouse checkpoint
         run: python -m pipeline.export_site ../site
       - uses: actions/configure-pages@v5
