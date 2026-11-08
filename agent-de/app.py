@@ -42,9 +42,8 @@ def view_from_result(result: dict) -> dict:
     return view
 
 
-def start_run(city: str, provider: str) -> None:
+def start_run(city: str, provider: str, request: str) -> None:
     """Run blocking tools off the UI thread, forwarding real events through a queue."""
-    request = city_request(city)
     messages = queue.Queue()
     selected = replace(settings, provider=provider)
     st.session_state["run_queue"] = messages
@@ -53,7 +52,7 @@ def start_run(city: str, provider: str) -> None:
     def worker():
         from agent.graph import run_pipeline
         try:
-            result = run_city(city, selected, on_event=lambda event: messages.put(("event", event)))
+            result = run_city(city, selected, request=request, on_event=lambda event: messages.put(("event", event)))
             messages.put(("result", result))
         except Exception as error:
             messages.put(("result", {"status": "failed", "errors": [str(error)],
@@ -68,6 +67,10 @@ if st.session_state.get("app_version") != 4 or st.session_state.get("result_city
     st.session_state["app_version"] = 4
     st.session_state["result"] = latest_result()
     st.session_state["view"] = view_from_result(st.session_state["result"])
+
+if st.session_state.get("request_city") != selected_city:
+    st.session_state["request_city"] = selected_city
+    st.session_state["request_text"] = city_request(selected_city)
 
 st.markdown("""<style>
 .stApp {background:#080f1f;color:#e2e8f0}
@@ -94,16 +97,21 @@ with st.expander("What does this do — and how is it useful?", expanded=False):
 The sources provide modeled estimates, not direct sensor readings. An anomaly is a signal to investigate, not a confirmed incident.""")
 with st.sidebar:
     st.header("Your workspace")
-    st.caption("Describe your request → refresh the data → explore the results.")
+    st.caption("Choose a city, describe what you need, then refresh the data.")
     provider = st.selectbox("Processing engine", ("builtin", "ollama", "gemini", "groq"),
                            index=("builtin", "ollama", "gemini", "groq").index(settings.provider),
                            format_func=lambda value: {"builtin": "Built-in · no API key needed", "ollama": "Ollama · local model", "gemini": "Gemini", "groq": "Groq"}[value])
     st.caption("Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
-    request = city_request(selected_city)
-    st.caption(f"Tracking temperature, humidity, and PM2.5 for {selected_city}, India.")
+    request = st.text_area(
+        "What would you like to track?",
+        key="request_text",
+        height=90,
+        placeholder=f"Example: Track daily weather and air quality for {selected_city} and flag anomalies.",
+        help="Keep the selected city in your request. FlowPilot currently supports weather, humidity, and air-quality analysis.",
+    )
     running = "run_queue" in st.session_state
     if st.button("Refresh data now", type="primary", disabled=running or not request.strip()):
-        start_run(selected_city, provider)
+        start_run(selected_city, provider, request)
         st.rerun()
     if st.button("Show latest saved results", disabled=running):
         st.session_state["result"] = latest_result()

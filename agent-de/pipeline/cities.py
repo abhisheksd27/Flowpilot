@@ -27,9 +27,9 @@ def city_result(settings, city):
     return saved
 
 
-def run_city(city, settings, **kwargs):
+def run_city(city, settings, *, request=None, **kwargs):
     from agent.graph import run_pipeline
-    result = run_pipeline(city_request(city), settings, **kwargs)
+    result = run_pipeline(request or city_request(city), settings, **kwargs)
     path = settings.data_dir / 'runs' / result['run_id'] / 'result.json'
     saved = json.loads(path.read_text())
     saved['requested_city'] = city
