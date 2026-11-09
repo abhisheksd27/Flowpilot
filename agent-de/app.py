@@ -95,15 +95,17 @@ with st.expander("What does this do — and how is it useful?", expanded=False):
 **A visible learning tool.** Follow the flow below to see how a real data pipeline collects, checks, stores, and analyzes information.
 
 The sources provide modeled estimates, not direct sensor readings. An anomaly is a signal to investigate, not a confirmed incident.""")
-st.subheader("Ask about current temperature")
+st.subheader("Ask about current weather")
 with st.form("temperature-question"):
     question = st.text_input("Your question", "What is the current temperature in Bangalore?", max_chars=300)
-    ask = st.form_submit_button("Get temperature")
+    ask = st.form_submit_button("Get weather", disabled="run_queue" in st.session_state)
 if ask:
     try:
         from pipeline.current_weather import answer_temperature
-        with st.spinner("Fetching current weather…"):
+        with st.status("Weather lookup: checking city and fetching Open-Meteo…", expanded=True) as lookup:
             st.session_state['temperature_answer'] = answer_temperature(question, settings)
+            st.write("City resolved → fresh current-weather response received → answer prepared")
+            lookup.update(label="Weather lookup completed", state="complete", expanded=False)
         st.session_state.pop('temperature_error', None)
     except Exception as error:
         st.session_state.pop('temperature_answer', None)
@@ -112,7 +114,9 @@ if st.session_state.get('temperature_error'):
     st.error(st.session_state['temperature_error'])
 if st.session_state.get('temperature_answer'):
     answer = st.session_state['temperature_answer']
-    st.success(f"The current modeled temperature in {answer['city']} is {answer['temperature']:.1f} {answer['unit']}.")
+    st.success(answer.get('answer', f"Temperature in {answer['city']}: {answer['temperature']:.1f} {answer['unit']}"))
+    fields = {'apparent_temperature': 'Feels like', 'relative_humidity_2m': 'Humidity', 'rain': 'Rain', 'showers': 'Showers', 'precipitation': 'Precipitation', 'snowfall': 'Snowfall', 'cloud_cover': 'Cloud cover', 'wind_speed_10m': 'Wind speed', 'wind_direction_10m': 'Wind direction', 'wind_gusts_10m': 'Wind gusts'}
+    st.dataframe([{'Detail': label, 'Value': answer.get('current', {}).get(field, 'Unavailable'), 'Unit': answer.get('units', {}).get(field, '')} for field, label in fields.items()], hide_index=True, width="stretch")
     st.caption(f"Source: Open-Meteo · Measurement time: {answer['time']} ({answer['timezone']}) · Fetched fresh when you clicked Get temperature. This answer does not run or update the warehouse pipeline.")
 with st.sidebar:
     st.header("Your workspace")
@@ -163,7 +167,7 @@ def live_dashboard():
     messages = st.session_state.get("run_queue")
     if messages is not None:
         # Limit batches to retain visible transitions without inventing delays.
-        for _ in range(3):
+        for _ in range(1):
             try:
                 kind, item = messages.get_nowait()
             except queue.Empty:
@@ -206,6 +210,7 @@ def live_dashboard():
         st.rerun()
 
 
+live_dashboard()
 if "run_queue" not in st.session_state:
     st.subheader(f"Your latest results · {selected_city}")
     result = st.session_state["result"]
@@ -213,4 +218,3 @@ if "run_queue" not in st.session_state:
         st.caption("Latest saved run: " + result.get("run_id", "Unknown") + " · Use ‘Show latest saved results’ after an automatic update.")
     render_results(result, settings)
     st.divider()
-live_dashboard()

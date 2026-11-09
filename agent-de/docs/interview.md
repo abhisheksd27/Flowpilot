@@ -30,7 +30,7 @@ streamlit run app.py
 
 Open the localhost URL printed by Streamlit. No model key or Docker is needed in demo mode. Internet is required to fetch real data.
 
-1. Enter “What is the current temperature in Bangalore?” in the main question field. Click Get temperature. The answer shows a fresh Open-Meteo modeled current value and its source timestamp. Bangalore and Banglore are mapped to Bengaluru.
+1. Enter “What is the current temperature in Bangalore?”, “Is it raining in Bengaluru?” or “How is the weather in Mumbai?” in the main question field. Click Get weather. The answer includes conditions, rain, humidity, wind, clouds and feels-like temperature with a source timestamp. Bangalore and Banglore are mapped to Bengaluru. Forecast questions are not supported in this field.
 2. Choose a city in the sidebar. Click Refresh data now to build its weather and air-quality dataset.
 3. Follow the actual workflow events, then inspect quality checks, trends, DuckDB tables and the downloadable report.
 4. Explain the architecture: request → validated plan → allowlisted API broker → raw snapshots → trusted transformation → staging → validation and source reconciliation → transactional DuckDB publication → anomalies and report.

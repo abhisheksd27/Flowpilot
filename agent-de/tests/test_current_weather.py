@@ -13,3 +13,15 @@ def test_temperature_alias_and_fresh_request():
     assert api.call_api.call_args.kwargs['refresh'] is True
     with pytest.raises(ValueError):
         answer_temperature('temperature in unknown city', Settings(), api=api)
+
+
+def test_rain_and_other_weather_details():
+    api = Mock()
+    api.call_api.return_value = {'current': {'temperature_2m': 21, 'time': '2026-11-09T10:00', 'rain': 0, 'showers': 1.2, 'weather_code': 80, 'relative_humidity_2m': 85}, 'current_units': {'temperature_2m': '°C'}}
+    result = answer_temperature('Is it raining in Bangalore?', Settings(), api=api)
+    assert 'Rain is indicated' in result['answer']
+    assert result['current']['relative_humidity_2m'] == 85
+    api.call_api.return_value['current']['showers'] = 0
+    assert 'No rain is indicated' in answer_temperature('weather in Bengaluru', Settings(), api=api)['answer']
+    with pytest.raises(ValueError, match='Forecast'):
+        answer_temperature('weather in Bengaluru tomorrow', Settings(), api=api)
