@@ -252,10 +252,10 @@ def live_dashboard():
         st.rerun()
 
 
+from ui_workspace import render_workspace
+render_workspace(settings, selected_city)
+st.divider()
 live_dashboard()
-with st.expander('Explore forecasts, data tools and pipeline operations', expanded=False):
-    from ui_workspace import render_workspace
-    render_workspace(settings, selected_city)
 if "run_queue" not in st.session_state:
     st.subheader(f"Your latest results · {selected_city}")
     result = st.session_state["result"]
