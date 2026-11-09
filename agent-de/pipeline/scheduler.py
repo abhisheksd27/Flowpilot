@@ -74,7 +74,7 @@ def watch(settings: Settings, request: str = DEFAULT_REQUEST, *, run_now: bool =
                 state["status"] = "running_pipeline"
                 write_json(folder / "status.json", state)
                 try:
-                    result = run_pipeline(request, settings)
+                    result = run_pipeline(request, settings, refresh=True)
                     state["last_run"] = {"run_id": result["run_id"], "status": result["status"], "finished_at": datetime.now(timezone.utc).isoformat()}
                     due = next_run(settings)
                 except Exception as error:

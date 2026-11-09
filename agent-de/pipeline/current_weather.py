@@ -5,7 +5,7 @@ from pipeline.contracts import WEATHER
 from tools.api_tool import APITool
 
 
-def answer_temperature(question, settings, *, api=None):
+def answer_temperature(question, settings, *, api=None, default_city=None):
     """Return current weather details; legacy name retained for callers."""
     if re.search(r'\b(tomorrow|yesterday|forecast|next week)\b', question, re.I):
         raise ValueError('This field answers current weather. Forecast questions are not supported yet.')
@@ -13,6 +13,8 @@ def answer_temperature(question, settings, *, api=None):
         raise ValueError('Ask about current weather, rain, temperature, humidity, clouds or wind.')
     text = re.sub(r'\b(bangalore|banglore)\b', 'Bengaluru', question, flags=re.I)
     cities = [city for city in LOCATIONS if re.search(r'\b' + city + r'\b', text, re.I)]
+    if not cities and default_city in LOCATIONS and not re.search(r'\b(in|for|at)\s+\w+', text, re.I):
+        cities = [default_city]
     if len(cities) != 1:
         raise ValueError('Please name one supported city: ' + ', '.join(LOCATIONS))
     city = cities[0]
@@ -29,7 +31,11 @@ def answer_temperature(question, settings, *, api=None):
     showers = current.get('showers')
     rain_text = 'Rain data unavailable.' if rain is None or showers is None else ('Rain is indicated in the current modeled interval.' if rain + showers > 0 else 'No rain is indicated in the current modeled interval.')
     condition = codes.get(current.get('weather_code'), 'Conditions unavailable')
+    details = []
+    for field, label in [('relative_humidity_2m', 'Humidity'), ('apparent_temperature', 'Feels like'), ('wind_speed_10m', 'Wind'), ('cloud_cover', 'Cloud cover')]:
+        if current.get(field) is not None:
+            details.append(f"{label}: {current[field]} {payload['current_units'].get(field, '')}")
     return {'city': city, 'temperature': value, 'time': current['time'],
             'timezone': location['timezone'], 'unit': payload['current_units']['temperature_2m'],
             'current': current, 'units': payload['current_units'],
-            'answer': f'{city}: {condition}. Temperature {value:.1f} °C. {rain_text}'}
+            'answer': f'{city}: {condition}. Temperature {value:.1f} °C. {rain_text} ' + '. '.join(details)}

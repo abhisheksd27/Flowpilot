@@ -103,7 +103,7 @@ if ask:
     try:
         from pipeline.current_weather import answer_temperature
         with st.status("Weather lookup: checking city and fetching Open-Meteo…", expanded=True) as lookup:
-            st.session_state['temperature_answer'] = answer_temperature(question, settings)
+            st.session_state['temperature_answer'] = answer_temperature(question, settings, default_city=selected_city)
             st.write("City resolved → fresh current-weather response received → answer prepared")
             lookup.update(label="Weather lookup completed", state="complete", expanded=False)
         st.session_state.pop('temperature_error', None)
@@ -147,6 +147,24 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.caption("Get weather answers above, or use Refresh data now to run the full data pipeline. Saved results include their original timestamps.")
+
+
+@st.fragment(run_every=30)
+def hourly_status():
+    schedule = scheduler_status(settings)
+    with st.expander('Hourly collection status', expanded=True):
+        st.write('Scheduler:', schedule.get('status', 'not started'))
+        if schedule.get('next_run_utc'):
+            st.write('Next update:', pd.Timestamp(schedule['next_run_utc']).tz_convert(settings.schedule_timezone).strftime('%d %b %Y %H:%M %Z'))
+        if schedule.get('last_run'):
+            last = schedule['last_run']
+            st.write('Last run:', last['status'], '·', last['run_id'])
+        if schedule.get('last_error'):
+            st.warning(schedule['last_error'])
+        st.caption('Hourly background collection tracks Bengaluru. Data quality checks and anomaly analysis run before reporting success. Click Show latest saved results to load a completed update. Your computer must remain awake.')
+
+
+hourly_status()
 
 
 @st.fragment(run_every=0.2 if "run_queue" in st.session_state else None)
