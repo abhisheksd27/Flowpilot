@@ -25,3 +25,16 @@ def test_rain_and_other_weather_details():
     assert 'No rain is indicated' in answer_temperature('weather in Bengaluru', Settings(), api=api)['answer']
     with pytest.raises(ValueError, match='Forecast'):
         answer_temperature('weather in Bengaluru tomorrow', Settings(), api=api)
+
+
+def test_sunny_day_night_and_clouds():
+    api = Mock()
+    current = {'temperature_2m': 25, 'time': '2026-11-09T12:00', 'weather_code': 0, 'is_day': 1}
+    api.call_api.return_value = {'current': current, 'current_units': {'temperature_2m': '°C'}}
+    assert answer_temperature('is it sunny in Bangalore?', Settings(), api=api)['answer'].startswith('Yes')
+    current['is_day'] = 0
+    assert 'nighttime' in answer_temperature('is it sunny in Bangalore?', Settings(), api=api)['answer']
+    current.update(is_day=1, weather_code=2)
+    assert 'sunny intervals' in answer_temperature('is it sunny in Bangalore?', Settings(), api=api)['answer']
+    current['weather_code'] = 3
+    assert 'does not indicate' in answer_temperature('is it sunny in Bangalore?', Settings(), api=api)['answer']

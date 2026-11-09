@@ -9,7 +9,7 @@ def answer_temperature(question, settings, *, api=None, default_city=None):
     """Return current weather details; legacy name retained for callers."""
     if re.search(r'\b(tomorrow|yesterday|forecast|next week)\b', question, re.I):
         raise ValueError('This field answers current weather. Forecast questions are not supported yet.')
-    if not re.search(r'weather|wether|rain|temp|humidity|wind|cloud|snow|drizzl|condition|hot|cold|feels', question, re.I):
+    if not re.search(r'weather|wether|rain|temp|humidity|wind|cloud|snow|drizzl|condition|hot|cold|feels|sunny|sunshine|clear|overcast|fog|storm', question, re.I):
         raise ValueError('Ask about current weather, rain, temperature, humidity, clouds or wind.')
     text = re.sub(r'\b(bangalore|banglore)\b', 'Bengaluru', question, flags=re.I)
     cities = [city for city in LOCATIONS if re.search(r'\b' + city + r'\b', text, re.I)]
@@ -21,7 +21,7 @@ def answer_temperature(question, settings, *, api=None, default_city=None):
     location = LOCATIONS[city]
     payload = (api or APITool(settings)).call_api(WEATHER, {
         'latitude': location['latitude'], 'longitude': location['longitude'],
-        'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m', 'timezone': location['timezone']}, refresh=True)
+        'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m', 'timezone': location['timezone']}, refresh=True)
     current = payload['current']
     value = current['temperature_2m']
     if not isinstance(value, (int, float)):
@@ -31,6 +31,18 @@ def answer_temperature(question, settings, *, api=None, default_city=None):
     showers = current.get('showers')
     rain_text = 'Rain data unavailable.' if rain is None or showers is None else ('Rain is indicated in the current modeled interval.' if rain + showers > 0 else 'No rain is indicated in the current modeled interval.')
     condition = codes.get(current.get('weather_code'), 'Conditions unavailable')
+    direct = ''
+    if re.search(r'sunny|sunshine', question, re.I):
+        if current.get('is_day') == 0:
+            direct = f'No—it is nighttime in {city}. '
+        elif current.get('is_day') == 1 and current.get('weather_code') in (0, 1):
+            direct = f'Yes—the current modeled conditions in {city} are clear or mainly clear during daylight. '
+        elif current.get('is_day') == 1 and current.get('weather_code') == 2:
+            direct = f'It is partly cloudy in {city}; there may be sunny intervals. '
+        elif current.get('is_day') == 1 and current.get('weather_code') in codes:
+            direct = f'The current model does not indicate clear sunny conditions in {city}. '
+        else:
+            direct = 'Sunshine conditions are unavailable in the current response. '
     details = []
     for field, label in [('relative_humidity_2m', 'Humidity'), ('apparent_temperature', 'Feels like'), ('wind_speed_10m', 'Wind'), ('cloud_cover', 'Cloud cover')]:
         if current.get(field) is not None:
@@ -38,4 +50,4 @@ def answer_temperature(question, settings, *, api=None, default_city=None):
     return {'city': city, 'temperature': value, 'time': current['time'],
             'timezone': location['timezone'], 'unit': payload['current_units']['temperature_2m'],
             'current': current, 'units': payload['current_units'],
-            'answer': f'{city}: {condition}. Temperature {value:.1f} °C. {rain_text} ' + '. '.join(details)}
+            'answer': direct + f'{city}: {condition}. Temperature {value:.1f} °C. {rain_text} ' + '. '.join(details)}
