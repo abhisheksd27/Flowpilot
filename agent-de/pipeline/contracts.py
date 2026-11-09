@@ -77,7 +77,7 @@ air["time"] = pd.to_datetime(air["time"], errors="raise")
 {dedup_code}
 frame = weather.merge(air, on="time", how="outer")
 frame = frame.rename(columns={{"temperature_2m": "temperature_c", "relative_humidity_2m": "humidity_pct", "pm2_5": "pm2_5_ug_m3"}})
-frame = frame[frame["time"] <= pd.Timestamp(plan["as_of"])]
+frame = frame[frame["time"].between(pd.Timestamp(plan["window_start"]), pd.Timestamp(plan["as_of"]))]
 frame["location_id"] = str(plan["location_id"])
 frame["city"] = plan["city"]
 for column in ["temperature_c", "humidity_pct", "pm2_5_ug_m3"]:
@@ -106,7 +106,7 @@ def reference_frame(snapshots: dict, plan: dict, options: dict):
             part.drop_duplicates(subset=["time"], inplace=True)
     frame = weather.merge(air, on="time", how="outer").rename(columns={
         "temperature_2m": "temperature_c", "relative_humidity_2m": "humidity_pct", "pm2_5": "pm2_5_ug_m3"})
-    frame = frame[frame["time"] <= pd.Timestamp(plan["as_of"])].copy()
+    frame = frame[frame["time"].between(pd.Timestamp(plan["window_start"]), pd.Timestamp(plan["as_of"]))].copy()
     frame["location_id"], frame["city"] = str(plan["location_id"]), plan["city"]
     for column in METRICS:
         frame[column] = pd.to_numeric(frame[column], errors="raise").astype(float)

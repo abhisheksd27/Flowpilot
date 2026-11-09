@@ -1,5 +1,7 @@
 # FlowPilot
 
+See the [full feature guide](docs/features.md) for forecasts, saved-data questions, city comparisons, quality trends, lineage, recovery, pipeline rules, NASA solar context, the read API and storage retention.
+
 **For interview demos:** start with the [local interview guide](docs/interview.md). It covers free setup without Docker or API keys, stop/restart behavior, saved data, hourly background runs, and the current-temperature question field.
 
 Quick launch after installing dependencies:

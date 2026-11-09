@@ -33,7 +33,8 @@ def normalize_generated_code(code: str) -> str:
 class Pipeline:
     """One run with injectable LLM, HTTP, execution, and event sink dependencies."""
     def __init__(self, settings: Settings, *, client: LLMClient | None = None,
-                 api=None, executor=run_python, on_event=None, refresh=False):
+                 api=None, executor=run_python, on_event=None, refresh=False,
+                 window=None, incremental=False, replay_plan=None, replay_code=None):
         self.settings = settings
         self.client = client or make_client(settings)
         self.api = api or APITool(settings)
@@ -51,6 +52,9 @@ class Pipeline:
         self.options = {"numeric": False, "deduplicate": False, "aliases": {}}
         self.refresh = refresh
         self.started_at = datetime.now(timezone.utc)
+        self.window = window
+        self.incremental = incremental
+        self.replay_plan, self.replay_code = replay_plan, replay_code
 
     def model(self, system: str, payload: dict, *, json_mode: bool = True):
         label = "Built-in deterministic rules" if self.settings.provider == "builtin" else self.settings.provider
@@ -88,17 +92,36 @@ class Pipeline:
                      "timezone": location["timezone"], "country": location.get("country", ""),
                      "as_of": (now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)).replace(tzinfo=None).isoformat(),
                      "window_start": (now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=5)).replace(tzinfo=None).isoformat()})
+        if self.replay_plan:
+            plan.update(self.replay_plan)
+            plan['historical'] = True
+        elif self.window:
+            start, end = map(pd.Timestamp, self.window)
+            if start.tzinfo or end.tzinfo or start > end or start < pd.Timestamp(now.replace(tzinfo=None)).normalize() - pd.Timedelta(days=90) or end > pd.Timestamp(plan['as_of']):
+                raise ValueError('Backfills require UTC times within the last 90 days and completed hours')
+            plan.update(window_start=start.isoformat(), as_of=end.isoformat(), historical=True)
+        elif self.incremental:
+            with connection(self.settings.db_path) as con:
+                exists = con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name='silver_environment'").fetchone()[0]
+                last = con.execute('SELECT max(time) FROM silver_environment WHERE location_id=?', [plan['location_id']]).fetchone()[0] if exists else None
+            if last:
+                # Reread two hours for revised model values; gaps older than this are explicit backfills.
+                start = max(pd.Timestamp(plan['window_start']), pd.Timestamp(last) - pd.Timedelta(hours=2))
+                plan['window_start'] = start.isoformat()
+                plan['incremental'] = True
+        if self.window or self.incremental and plan.get('incremental'):
+            plan['parameters'] = {'start_hour': plan['window_start'][:16], 'end_hour': plan['as_of'][:16], 'timezone': 'UTC'}
         state["plan"] = plan
         return state
 
     def generate_code(self, state: AgentState):
         for attempt in range(self.settings.max_retries + 1):
             try:
-                code = self.model(CODE_SYSTEM, {"task": "generate_code", "instructions": CODE_GEN_PROMPT,
+                code = self.replay_code or self.model(CODE_SYSTEM, {"task": "generate_code", "instructions": CODE_GEN_PROMPT,
                     "plan": state["plan"], "reference_code": transform_code(),
                     "previous_errors": state["errors"]}, json_mode=False)
                 # Keep prose invalid; accept only a complete outer code fence.
-                code = normalize_generated_code(code)
+                code = normalize_generated_code(code).rstrip() + '\n'
                 validate_code(code)
                 state["code"] = code
                 return state
@@ -168,6 +191,11 @@ class Pipeline:
             raise ValueError("Generated output failed source reconciliation") from error
         state["validation_result"]["checks"].append({"check": "source_reconciliation", "passed": True,
                                                    "detail": "Every staged value matches approved source measurements"})
+        from pipeline.rules import load_config, evaluate_rules
+        config = load_config(self.settings)
+        state['custom_rules'] = evaluate_rules(frame, config.get('rules', [])) if config and config['city'] == plan['city'] else []
+        if any(r['action'] == 'block' and not r['passed'] for r in state['custom_rules']):
+            raise PermissionError('Publication blocked by configured business rule; see custom rule results')
         with self.log.operation("publish", "Publish validated hourly and daily tables atomically"):
 
             state["published"] = publish(self.settings, frame, plan, self.run_id,
@@ -226,8 +254,11 @@ class Pipeline:
         return state
 
     def anomaly_detect(self, state: AgentState):
+        from pipeline.rules import load_config
+        config = load_config(self.settings)
+        measurements = config['measurements'] if config and config['city'] == state['plan']['city'] else METRICS
         state["anomalies"] = {metric: detect_anomalies("silver_environment", metric, self.settings.db_path,
-                                 location_id=state["plan"]["location_id"]) for metric in METRICS}
+                                 location_id=state["plan"]["location_id"]) for metric in measurements}
         state["status"] = "success"
         return state
 
@@ -246,6 +277,8 @@ class Pipeline:
         for check in state.get("validation_result", {}).get("checks", []):
             lines.append(f"- {'PASS' if check['passed'] else 'FAIL'} {check['check']}: {check['detail']}")
         lines += ["", "## Repairs"] + [f"- {fix['action']}: {fix['diagnosis']}" for fix in state["previous_fixes"]]
+        if state.get('custom_rules'):
+            lines += ['', '## Custom business rules'] + [f"- {r['metric']} {r['operator']} {r['threshold']}: {r['matches']} matches; action {r['action']}" for r in state['custom_rules']]
         lines += ["", "## Anomalies"]
         for name, result in state.get("anomalies", {}).items():
             lines.append(f"- {name}: {result['count']} flags; {result['status']}; {result.get('samples', 0)} samples")
@@ -321,6 +354,14 @@ class Pipeline:
                 saved["status"] = outcome
                 write_json(result_path, saved)
                 write_json(self.settings.data_dir / "latest.json", saved)
+            from pipeline.operations import alert, daily_summary
+            try:
+                if outcome != 'success':
+                    alert(self.settings, 'failed-' + self.run_id, '\n'.join(state.get('errors', [])))
+                elif state.get('plan', {}).get('city'):
+                    daily_summary(self.settings, state['plan']['city'])
+            except Exception as error:
+                self.log.emit('log', 'failed', 'Summary/alert update failed: ' + str(error))
             return state
 
 

@@ -21,3 +21,4 @@ class AgentState(TypedDict, total=False):
     source_schema: dict[str, Any]
     schema_drift: dict[str, Any]
     accepted_drift: bool
+    custom_rules: list[dict[str, Any]]

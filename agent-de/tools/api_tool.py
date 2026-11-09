@@ -9,7 +9,8 @@ from tools.cache import DiskCache, digest
 
 ALLOWED_ENDPOINTS = {"api.open-meteo.com": "/v1/forecast",
                      "air-quality-api.open-meteo.com": "/v1/air-quality",
-                     "geocoding-api.open-meteo.com": "/v1/search"}
+                     "geocoding-api.open-meteo.com": "/v1/search",
+                     "power.larc.nasa.gov": "/api/temporal/daily/point"}
 
 
 def check_url(url: str) -> None:
@@ -33,8 +34,9 @@ class APITool:
     def call_api(self, url: str, params: dict[str, Any], *, refresh: bool = False) -> dict:
         """Retry transient failures and malformed bodies, never caching a failed response."""
         check_url(url)
-        allowed = {"name", "count", "language", "format"} if "geocoding" in url else {
-            "latitude", "longitude", "hourly", "current", "past_days", "forecast_days", "timezone"}
+        allowed = ({"parameters", "community", "longitude", "latitude", "start", "end", "format"} if "power.larc.nasa.gov" in url else
+                   {"name", "count", "language", "format"} if "geocoding" in url else {
+            "latitude", "longitude", "hourly", "daily", "current", "past_days", "forecast_days", "timezone", "start_date", "end_date", "start_hour", "end_hour"})
         if set(params) - allowed:
             raise ValueError("API parameters outside the supported catalog")
         key = digest([url, params])

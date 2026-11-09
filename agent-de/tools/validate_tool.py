@@ -42,7 +42,9 @@ def validate_data(table: str, db_path: Path | None = None, *, plan: dict | None 
     moment = pd.Timestamp(now).tz_convert("UTC").tz_localize(None)
     times = pd.to_datetime(frame.get("time", pd.Series(dtype="datetime64[ns]")), errors="coerce")
     latest = times.max()
-    add("freshness", pd.notna(latest) and moment - pd.Timedelta(hours=3) <= latest <= moment,
+    historical = bool(plan and plan.get('historical', False))
+    fresh = pd.notna(latest) and latest <= moment and (historical or moment - pd.Timedelta(hours=3) <= latest)
+    add("historical_time_boundary" if historical else "freshness", fresh,
         f"Latest completed hour: {latest}; checked at {moment} UTC")
     if plan:
         add("location", frame["location_id"].eq(plan["location_id"]).all() and frame["city"].eq(plan["city"]).all(), "Location matches resolved plan")

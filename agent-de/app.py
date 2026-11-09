@@ -102,8 +102,21 @@ with st.form("temperature-question"):
 if ask:
     try:
         from pipeline.current_weather import answer_temperature
+        import re
         with st.status("Weather lookup: checking city and fetching Open-Meteo…", expanded=True) as lookup:
-            st.session_state['temperature_answer'] = answer_temperature(question, settings, default_city=selected_city)
+            if re.search(r'tomorrow|weekend|forecast|next week', question, re.I):
+                from pipeline.forecasts import forecast
+                normalized = re.sub(r'\b(bangalore|banglore)\b', 'Bengaluru', question, flags=re.I)
+                cities = [name for name in CITIES if re.search(r'\b' + name + r'\b', normalized, re.I)]
+                if len(cities) > 1:
+                    raise ValueError('Ask for one city forecast at a time')
+                city = cities[0] if cities else selected_city
+                st.session_state['temperature_answer'] = {'forecast': forecast(question, city, settings)}
+            elif re.search(r'today.*(hotter|warmer|colder).*yesterday|how many hours', question, re.I):
+                from pipeline.analytics import ask_saved
+                st.session_state['temperature_answer'] = {'saved': ask_saved(question, selected_city, settings)}
+            else:
+                st.session_state['temperature_answer'] = answer_temperature(question, settings, default_city=selected_city)
             st.write("City resolved → fresh current-weather response received → answer prepared")
             lookup.update(label="Weather lookup completed", state="complete", expanded=False)
         st.session_state.pop('temperature_error', None)
@@ -112,7 +125,16 @@ if ask:
         st.session_state['temperature_error'] = str(error)
 if st.session_state.get('temperature_error'):
     st.error(st.session_state['temperature_error'])
-if st.session_state.get('temperature_answer'):
+if st.session_state.get('temperature_answer', {}).get('forecast'):
+    forecast_answer = st.session_state['temperature_answer']['forecast']
+    st.success(forecast_answer['city'] + '\n\n' + forecast_answer['answer'])
+    st.dataframe(forecast_answer['days'], hide_index=True)
+    st.caption('Open-Meteo forecast · Retrieved ' + forecast_answer['issued_at'] + ' · Probabilities are forecasts, not guarantees.')
+elif st.session_state.get('temperature_answer', {}).get('saved'):
+    saved_answer = st.session_state['temperature_answer']['saved']
+    st.success(saved_answer['answer'])
+    st.dataframe(saved_answer['days'], hide_index=True)
+elif st.session_state.get('temperature_answer'):
     answer = st.session_state['temperature_answer']
     st.success(answer.get('answer', f"Temperature in {answer['city']}: {answer['temperature']:.1f} {answer['unit']}"))
     fields = {'apparent_temperature': 'Feels like', 'relative_humidity_2m': 'Humidity', 'rain': 'Rain', 'showers': 'Showers', 'precipitation': 'Precipitation', 'snowfall': 'Snowfall', 'cloud_cover': 'Cloud cover', 'wind_speed_10m': 'Wind speed', 'wind_direction_10m': 'Wind direction', 'wind_gusts_10m': 'Wind gusts'}
@@ -161,6 +183,18 @@ def hourly_status():
             st.write('Last run:', last['status'], '·', last['run_id'])
         if schedule.get('last_error'):
             st.warning(schedule['last_error'])
+        try:
+            from pipeline.operations import check_alerts
+            health = check_alerts(settings, selected_city)
+            if health['stale']:
+                st.warning('Saved weather data is stale or missing for ' + selected_city)
+            if health['latest_status'] in ('failed', 'partial'):
+                st.error('Latest pipeline issue: ' + '\n'.join(health['errors']))
+                if st.session_state.get('notified_failure') != health['latest_run']:
+                    st.toast('Pipeline failed. Open Operations for the exact error.', icon='⚠️')
+                    st.session_state['notified_failure'] = health['latest_run']
+        except Exception as error:
+            st.caption('Health status temporarily unavailable: ' + str(error))
         st.caption('Hourly background collection tracks Bengaluru. Data quality checks and anomaly analysis run before reporting success. Click Show latest saved results to load a completed update. Your computer must remain awake.')
 
 
@@ -219,6 +253,9 @@ def live_dashboard():
 
 
 live_dashboard()
+with st.expander('Explore forecasts, data tools and pipeline operations', expanded=False):
+    from ui_workspace import render_workspace
+    render_workspace(settings, selected_city)
 if "run_queue" not in st.session_state:
     st.subheader(f"Your latest results · {selected_city}")
     result = st.session_state["result"]

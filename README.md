@@ -6,6 +6,7 @@ A weather and air-quality data engineering project with real Open-Meteo data, va
 - [Setup, saved data and background operation](agent-de/docs/interview.md)
 - [Project overview and architecture](agent-de/README.md)
 - [Detailed architecture](agent-de/docs/architecture.md)
+- [Feature guide: forecasts, analytics, recovery, rules, API and retention](agent-de/docs/features.md)
 - [Public dashboard](https://abhisheksd27.github.io/Flowpilot/)
 
 ```bash

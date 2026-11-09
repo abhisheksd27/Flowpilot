@@ -74,17 +74,42 @@ def watch(settings: Settings, request: str = DEFAULT_REQUEST, *, run_now: bool =
                 state["status"] = "running_pipeline"
                 write_json(folder / "status.json", state)
                 try:
-                    result = run_pipeline(request, settings, refresh=True)
+                    from dataclasses import replace
+                    from pipeline.rules import load_config
+                    from pipeline.cities import city_request
+                    config = load_config(settings)
+                    active_settings = replace(settings, schedule_frequency=config['frequency'], schedule_time=config['at']) if config else settings
+                    active_request = city_request(config['city']) if config else request
+                    result = run_pipeline(active_request, active_settings, refresh=True, incremental=True)
                     state["last_run"] = {"run_id": result["run_id"], "status": result["status"], "finished_at": datetime.now(timezone.utc).isoformat()}
-                    due = next_run(settings)
+                    state.pop('last_error', None)
+                    if result['status'] != 'success':
+                        state['last_error'] = '\n'.join(result.get('errors', []))
+                    policy_path = settings.data_dir / 'retention-policy.json'
+                    if policy_path.exists():
+                        policy = json.loads(policy_path.read_text())
+                        if policy.get('enabled'):
+                            from pipeline.operations import apply_retention
+                            apply_retention(settings, int(policy['days']))
+                    due = next_run(active_settings)
+                    state.update(request=active_request, frequency=active_settings.schedule_frequency, schedule=active_settings.schedule_time)
                 except Exception as error:
                     state["last_error"] = str(error)
+                    from pipeline.operations import alert
+                    alert(settings, 'scheduler-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M'), str(error))
                     # A competing manual run or temporary setup error retries in 15 minutes.
                     due = datetime.now(timezone.utc) + timedelta(minutes=15)
                 state["status"] = "waiting"
                 state["next_run_utc"] = due.isoformat()
                 state["heartbeat"] = datetime.now(timezone.utc).isoformat()
             write_json(folder / "status.json", state)
+            try:
+                from pipeline.operations import check_alerts
+                from pipeline.contracts import default_plan
+                check_alerts(settings, default_plan(state['request'])['city'])
+            except Exception as error:
+                import logging
+                logging.getLogger(__name__).warning('Health check could not run: %s', error)
             stop.wait(15)
         state.update(status="stopped", heartbeat=datetime.now(timezone.utc).isoformat())
         write_json(folder / "status.json", state)
