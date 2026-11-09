@@ -2,7 +2,8 @@
 
 A weather and air-quality data engineering project with real Open-Meteo data, validated DuckDB tables, anomaly analysis, reports and an interactive workflow view.
 
-- [Run locally for an interview (free, no Docker or API keys)](agent-de/docs/interview.md)
+- [Run the full pipeline locally with Docker (manual operation)](agent-de/docs/local-runtime.md)
+- [Setup, saved data and background operation](agent-de/docs/interview.md)
 - [Project overview and architecture](agent-de/README.md)
 - [Detailed architecture](agent-de/docs/architecture.md)
 - [Public dashboard](https://abhisheksd27.github.io/Flowpilot/)
@@ -13,7 +14,8 @@ cd Flowpilot/agent-de
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-DEMO_MODE=true LLM_PROVIDER=builtin streamlit run app.py
+sh scripts/build-sandbox.sh
+sh scripts/run-local-docker.sh
 ```
 
 Ask “What is the current temperature in Bangalore?” in the main interface, or use the sidebar to build the full weather and air-quality dataset. The free local demo uses trusted built-in transformations. Optional AI providers and isolated generated-code execution remain available in full mode.

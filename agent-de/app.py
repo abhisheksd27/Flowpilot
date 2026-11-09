@@ -52,7 +52,7 @@ def start_run(city: str, provider: str, request: str) -> None:
     def worker():
         from agent.graph import run_pipeline
         try:
-            result = run_city(city, selected, request=request, on_event=lambda event: messages.put(("event", event)))
+            result = run_city(city, selected, request=request, refresh=True, on_event=lambda event: messages.put(("event", event)))
             messages.put(("result", result))
         except Exception as error:
             messages.put(("result", {"status": "failed", "errors": [str(error)],
@@ -117,9 +117,10 @@ if st.session_state.get('temperature_answer'):
     st.success(answer.get('answer', f"Temperature in {answer['city']}: {answer['temperature']:.1f} {answer['unit']}"))
     fields = {'apparent_temperature': 'Feels like', 'relative_humidity_2m': 'Humidity', 'rain': 'Rain', 'showers': 'Showers', 'precipitation': 'Precipitation', 'snowfall': 'Snowfall', 'cloud_cover': 'Cloud cover', 'wind_speed_10m': 'Wind speed', 'wind_direction_10m': 'Wind direction', 'wind_gusts_10m': 'Wind gusts'}
     st.dataframe([{'Detail': label, 'Value': answer.get('current', {}).get(field, 'Unavailable'), 'Unit': answer.get('units', {}).get(field, '')} for field, label in fields.items()], hide_index=True, width="stretch")
-    st.caption(f"Source: Open-Meteo · Measurement time: {answer['time']} ({answer['timezone']}) · Fetched fresh when you clicked Get temperature. This answer does not run or update the warehouse pipeline.")
+    st.caption(f"Source: Open-Meteo · Measurement time: {answer['time']} ({answer['timezone']}) · Fetched fresh when you clicked Get weather. This answer does not run or update the warehouse pipeline.")
 with st.sidebar:
     st.header("Your workspace")
+    st.caption(f"Execution: {'trusted lightweight mode' if settings.demo_mode else settings.sandbox_backend + ' isolation'} · Data: real Open-Meteo responses")
     st.caption("Choose a city, describe what you need, then refresh the data.")
     advanced = st.checkbox("Advanced options", value=False, disabled="run_queue" in st.session_state)
     engines = ("builtin",) if settings.demo_mode or not advanced else ("builtin", "ollama", "gemini", "groq")
@@ -137,7 +138,7 @@ with st.sidebar:
         help="Keep the selected city in your request. FlowPilot currently supports weather, humidity, and air-quality analysis.",
     )
     running = "run_queue" in st.session_state
-    if st.button("Refresh data now", type="primary", disabled=running or not request.strip()):
+    if st.button("Run pipeline now", type="primary", disabled=running or not request.strip()):
         start_run(selected_city, provider, request)
         st.rerun()
     if st.button("Show latest saved results", disabled=running):

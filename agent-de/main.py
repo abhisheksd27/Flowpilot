@@ -17,6 +17,7 @@ def main() -> int:
     parser.add_argument("--run-now", action="store_true", help="Watch: also run immediately")
     parser.add_argument("--install", action="store_true", help="Schedule: install a per-user macOS launch agent")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--refresh", action="store_true", help="Run: fetch fresh source responses instead of using API cache")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -28,7 +29,7 @@ def main() -> int:
     try:
         if args.command == "run":
             from agent.graph import run_pipeline
-            result = run_pipeline(args.request, settings)
+            result = run_pipeline(args.request, settings, refresh=args.refresh)
             print(result.get("final_report", "Pipeline failed before reporting"))
             return 0 if result["status"] == "success" else 1
         if args.command == "preview":

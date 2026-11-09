@@ -33,7 +33,7 @@ def normalize_generated_code(code: str) -> str:
 class Pipeline:
     """One run with injectable LLM, HTTP, execution, and event sink dependencies."""
     def __init__(self, settings: Settings, *, client: LLMClient | None = None,
-                 api=None, executor=run_python, on_event=None):
+                 api=None, executor=run_python, on_event=None, refresh=False):
         self.settings = settings
         self.client = client or make_client(settings)
         self.api = api or APITool(settings)
@@ -49,7 +49,7 @@ class Pipeline:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.log = EventLog(settings.data_dir / "logs" / f"run_{self.run_id}.jsonl", self.run_id, on_event)
         self.options = {"numeric": False, "deduplicate": False, "aliases": {}}
-        self.refresh = False
+        self.refresh = refresh
         self.started_at = datetime.now(timezone.utc)
 
     def model(self, system: str, payload: dict, *, json_mode: bool = True):
