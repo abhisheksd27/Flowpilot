@@ -39,6 +39,17 @@ Demo mode applies trusted repository functions. AI code generation and OS isolat
 
 ## Stop and restart
 
+### Local UI with real Docker execution
+
+Start Docker Desktop, then from `agent-de`:
+
+```bash
+sh scripts/build-sandbox.sh
+sh scripts/run-local-docker.sh
+```
+
+The UI runs at http://localhost:8504. Streamlit runs on the host; each transformation executes inside a short-lived Docker worker with network disabled, read-only root filesystem, reduced privileges and resource limits. The default built-in engine needs no credentials, and uses the real sandbox rather than demo mode. Select a configured AI provider in the sidebar to test generated code. Build the image again after worker changes; otherwise only the launch command is needed. Ctrl+C stops the UI. Docker Desktop must remain running.
+
 Press Ctrl+C in the terminal. Run the same Streamlit command whenever needed. The local `data/` directory keeps the warehouse, raw snapshots, reports, logs and saved results. Restarting displays saved results with their timestamps; it does not automatically fetch new data. Click Refresh data now to update the pipeline. API responses can be reused for up to 900 seconds by default. Older cache entries expire; failed API calls do not silently become fresh data. Get temperature explicitly bypasses the API cache on every click. Previously displayed temperature answers remain on screen until you ask again or end the session.
 
 Pipeline publication updates matching location/timestamp rows without duplicating them. History remains in DuckDB while `data/` is retained. The normal ingestion window is five past days plus today; stopping for longer can leave historical gaps. Do not delete `data/` if you want to preserve results. It is intentionally excluded from GitHub.
