@@ -62,9 +62,9 @@ def start_run(city: str, provider: str, request: str) -> None:
     thread.start()
 
 
-if st.session_state.get("app_version") != 4 or st.session_state.get("result_city") != selected_city:
+if st.session_state.get("app_version") != 5 or st.session_state.get("result_city") != selected_city:
     st.session_state["result_city"] = selected_city
-    st.session_state["app_version"] = 4
+    st.session_state["app_version"] = 5
     st.session_state["result"] = latest_result()
     st.session_state["view"] = view_from_result(st.session_state["result"])
 
@@ -121,11 +121,13 @@ if st.session_state.get('temperature_answer'):
 with st.sidebar:
     st.header("Your workspace")
     st.caption("Choose a city, describe what you need, then refresh the data.")
-    engines = ("builtin",) if settings.demo_mode else ("builtin", "ollama", "gemini", "groq")
+    advanced = st.checkbox("Advanced options", value=False, disabled="run_queue" in st.session_state)
+    engines = ("builtin",) if settings.demo_mode or not advanced else ("builtin", "ollama", "gemini", "groq")
     provider = st.selectbox("Processing engine", engines,
-                           index=engines.index("builtin" if settings.demo_mode else settings.provider),
+                           index=0,
                            format_func=lambda value: {"builtin": "Built-in · no API key needed", "ollama": "Ollama · local model", "gemini": "Gemini", "groq": "Groq"}[value])
-    st.caption("Free interview demo · real data and trusted transformations. AI engines can be enabled on a server with Docker." if settings.demo_mode else "Built-in uses deterministic rules and real data. Model providers require their configured service or key.")
+    if advanced:
+        st.caption("AI providers are experimental and can fail to generate valid transformations. Built-in runs the tested transformation with real data.")
     request = st.text_area(
         "What would you like to track?",
         key="request_text",
@@ -143,20 +145,7 @@ with st.sidebar:
         st.session_state["view"] = view_from_result(st.session_state["result"])
         st.rerun()
     st.divider()
-    st.subheader("Local automation")
-    st.caption("This demo updates when you click Refresh. Free hosting can sleep and reset saved data. The public GitHub dashboard updates hourly." if settings.demo_mode else "The local schedule tracks Bengaluru. Refresh other cities manually here; the public dashboard updates all six cities hourly.")
-    schedule = scheduler_status(settings)
-    st.write("Status:", {"waiting": "Active · waiting for next update", "running_pipeline": "Updating data", "not_started": "Not started", "stopped": "Stopped", "stale_or_stopped": "Needs attention"}.get(schedule.get("status"), "Unknown"))
-    frequency = schedule.get("frequency", settings.schedule_frequency)
-    cadence = "Every hour, at minute 00" if frequency == "hourly" else schedule.get("schedule", settings.schedule_time)
-    st.caption(f"Schedule: {cadence} · {schedule.get('timezone', settings.schedule_timezone)}")
-    if schedule.get("next_run_utc"):
-        st.write("Next run:", pd.Timestamp(schedule["next_run_utc"]).tz_convert(settings.schedule_timezone).strftime("%d %b %Y, %H:%M %Z"))
-    if schedule.get("last_run"):
-        last_run = schedule["last_run"]
-        finished = pd.Timestamp(last_run["finished_at"]).tz_convert(settings.schedule_timezone).strftime("%d %b, %H:%M %Z")
-        st.caption(f"Last automatic update: {finished} · {last_run['status']}")
-    st.caption("Automatic runs need this computer awake and the project drive mounted. The UI may be closed.")
+    st.caption("Get weather answers above, or use Refresh data now to run the full data pipeline. Saved results include their original timestamps.")
 
 
 @st.fragment(run_every=0.2 if "run_queue" in st.session_state else None)
@@ -216,5 +205,15 @@ if "run_queue" not in st.session_state:
     result = st.session_state["result"]
     if result:
         st.caption("Latest saved run: " + result.get("run_id", "Unknown") + " · Use ‘Show latest saved results’ after an automatic update.")
-    render_results(result, settings)
+    if advanced:
+        render_results(result, settings)
+    elif result:
+        if result.get('status') == 'success':
+            st.success('Data validated and saved.')
+        else:
+            st.warning('The last saved run failed. Refresh with the built-in engine to try again.')
+        st.markdown(result.get('final_report', 'No report available yet.'))
+        if result.get('final_report'):
+            st.download_button('Download report', result['final_report'], file_name='flowpilot-report.md')
+        st.caption('Enable Advanced options for charts, quality checks, generated code, SQL and history.')
     st.divider()
